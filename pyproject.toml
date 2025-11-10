@@ -1,0 +1,55 @@
+[project]
+name = "resume_builder"
+version = "0.1.0"
+description = "AI resume builder using CrewAI + Gradio UI"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "crewai[tools]==1.2.1",
+  "pydantic>=2.7,<3",
+  "python-dotenv>=1.0.1",
+  "unidecode>=1.4.0",
+  "pypdf2>=3.0.1",
+  "gradio>=4.44.0,<6",
+  "ipykernel>=6.29",
+  "notebook>=7.2",
+  "pip>=25.3",
+  "jupyter>=1.1.1",
+  "pytest>=9.0.0",
+  "pypdf>=6.1.3",
+  "python-docx>=1.2.0",
+]
+
+[project.optional-dependencies]
+ui = ["gradio>=4.44.0,<6"]
+notebooks = ["ipykernel>=6.29", "notebook>=7.2"]
+
+[project.scripts]
+resume_ui = "resume_builder.main:run_ui"
+resume_headless = "resume_builder.main:main"
+run_crew = "resume_builder.main:run_crew"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/resume_builder"]
+
+[tool.hatch.build]
+include = [
+  "src/resume_builder/**",
+  "README.md",
+  "LICENSE",
+  "config/**",
+  "output/**",
+]
+
+[tool.crewai]
+type = "crew"
+entrypoint = "resume_builder.main:run"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]

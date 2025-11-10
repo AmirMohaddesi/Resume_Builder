@@ -1,0 +1,325 @@
+# Simplified task configuration - Agents output JSON, Python handles LaTeX
+# NO MORE LATEX IN AGENT TASKS!
+
+# ============================================
+# PHASE 1: INPUT PROCESSING (4 tasks)
+# ============================================
+
+profile_validation_task:
+  description: >
+    Use the profile_reader tool to read: output/user_profile.json
+    
+    Check that it has:
+    - identity.first
+    - identity.last
+    - identity.email
+    
+    Output JSON to output/validated_profile.json:
+    {"validation_status": "success" or "failed", "message": "..."}
+  expected_output: Validation JSON at output/validated_profile.json
+  agent: profile_validator
+  output_file: output/validated_profile.json
+
+collect_file_info_task:
+  description: >
+    Check if a custom .tex file was uploaded by looking for: output/custom_template.tex
+    
+    If .tex file exists:
+    1. Use tex_info_extractor tool to extract information from output/custom_template.tex
+    2. Use profile_reader tool to read the current profile: output/user_profile.json
+    3. Merge the information intelligently:
+       - If profile is missing email, phone, website, linkedin, github → Use info from .tex
+       - If profile has these fields but they look malformed → Replace with .tex info
+       - Preserve all other profile data (experience, education, skills, projects)
+    4. Save the enhanced profile back to: output/user_profile.json
+    
+    If no .tex file:
+    - Output: {"status": "skipped", "message": "No .tex file to extract info from"}
+    
+    Output JSON to output/file_collection_report.json:
+    {
+      "status": "enhanced" | "skipped",
+      "tex_file_found": true/false,
+      "fields_updated": ["email", "website", "linkedin", ...],
+      "message": "..."
+    }
+  expected_output: File collection report showing what info was merged
+  agent: file_collector
+  context:
+    - profile_validation_task
+  output_file: output/file_collection_report.json
+
+template_validation_task:
+  description: >
+    Check if a custom LaTeX template was provided by looking for: output/custom_template.tex
+    
+    If the file exists:
+    - Use the latex_package_checker tool with tex_file_path: "output/custom_template.tex"
+    - Review the report for missing packages
+    - If packages are missing, output clear warnings and installation recommendations
+    
+    If no custom template:
+    - Output: {"status": "skipped", "message": "No custom template provided, using default"}
+    
+    Output JSON to output/template_validation.json:
+    {
+      "status": "success" | "warning" | "skipped",
+      "template_provided": true/false,
+      "missing_packages": [...],
+      "recommendations": "...",
+      "message": "..."
+    }
+  expected_output: Template validation report JSON
+  agent: template_validator
+  output_file: output/template_validation.json
+
+parse_job_description_task:
+  description: >
+    Parse the job description and output JSON with:
+    - title, company, location (optional)
+    - skills (array), keywords (array)
+    - cleaned_text
+    
+    Output JSON only, no markdown.
+  expected_output: Parsed JD JSON
+  agent: jd_analyst
+  inputs:
+    text: "{{input.job_description}}"
+  output_file: output/parsed_jd.json
+
+# ============================================
+# PHASE 2: CONTENT SELECTION (3 focused tasks)
+# ============================================
+
+select_experiences_task:
+  description: >
+    Use profile_reader to read: output/user_profile.json
+    Read parsed JD from: output/parsed_jd.json
+    
+    Select the top 3-5 work experiences that best match the job description.
+    For each selected experience, include: organization, title, location, dates, and description (array of bullet points).
+    
+    Output JSON format:
+    {
+      "selected_experiences": [
+        {
+          "organization": "Company Name",
+          "title": "Job Title",
+          "location": "City, State",
+          "dates": "Jan 2020 - Present",
+          "description": ["Bullet point 1", "Bullet point 2"]
+        }
+      ]
+    }
+    
+    Write to output/selected_experiences.json
+  expected_output: JSON with selected experiences (plain text, NO LaTeX)
+  agent: experience_selector
+  context:
+    - profile_validation_task
+    - parse_job_description_task
+  output_file: output/selected_experiences.json
+
+select_projects_task:
+  description: >
+    Use profile_reader to read: output/user_profile.json
+    Read parsed JD from: output/parsed_jd.json
+    
+    Select 2-4 projects that are most relevant to the job.
+    For each project, include: name, description, and optional url.
+    
+    Output JSON format:
+    {
+      "selected_projects": [
+        {
+          "name": "Project Name",
+          "description": "Brief description of project",
+          "url": "https://github.com/user/project" (optional)
+        }
+      ]
+    }
+    
+    Write to output/selected_projects.json
+  expected_output: JSON with selected projects (plain text, NO LaTeX)
+  agent: project_selector
+  context:
+    - profile_validation_task
+    - parse_job_description_task
+  output_file: output/selected_projects.json
+
+select_skills_task:
+  description: >
+    Use profile_reader to read: output/user_profile.json
+    Read parsed JD from: output/parsed_jd.json
+    
+    Select 8-12 skills that best match the job requirements.
+    Prioritize skills mentioned in the job description.
+    
+    Output JSON format:
+    {
+      "selected_skills": ["Python", "Machine Learning", "ROS2", ...]
+    }
+    
+    Write to output/selected_skills.json
+  expected_output: JSON with selected skills as simple string array (NO LaTeX)
+  agent: skill_selector
+  context:
+    - profile_validation_task
+    - parse_job_description_task
+  output_file: output/selected_skills.json
+
+# ============================================
+# PHASE 3: CONTENT WRITING (2 focused tasks)
+# ============================================
+
+write_summary_task:
+  description: >
+    Use profile_reader to read: output/user_profile.json
+    Read selections from: output/selected_experiences.json, output/selected_skills.json
+    Read JD from: output/parsed_jd.json
+    
+    Write a professional 2-3 sentence summary tailored to the job.
+    Highlight relevant experience, key skills, and fit for the role.
+    
+    Output JSON format:
+    {
+      "summary": "Your professionally written summary text here..."
+    }
+    
+    IMPORTANT: Output plain text only - NO LaTeX commands, NO special formatting.
+    Write to output/summary_block.json
+  expected_output: JSON with summary as plain text (NO LaTeX)
+  agent: summary_writer
+  context:
+    - select_experiences_task
+    - select_skills_task
+  output_file: output/summary_block.json
+
+write_education_section_task:
+  description: >
+    Use profile_reader to read: output/user_profile.json
+    
+    Extract ALL education entries from identity.education array.
+    For each entry, include: degree, institution, location, dates, and optional details (GPA, honors, etc.).
+    
+    Output JSON format:
+    {
+      "education": [
+        {
+          "degree": "Ph.D. in Computer Science",
+          "institution": "University Name",
+          "location": "City, State",
+          "dates": "2020 - 2024",
+          "gpa": "3.9/4.0" (optional),
+          "honors": "Summa Cum Laude" (optional)
+        }
+      ]
+    }
+    
+    IMPORTANT: Output plain text only - NO LaTeX commands.
+    Write to output/education_block.json
+  expected_output: JSON with education entries as plain text (NO LaTeX)
+  agent: education_writer
+  context:
+    - profile_validation_task
+  output_file: output/education_block.json
+
+# ============================================
+# PHASE 4: QUALITY & COMPILATION (3 tasks)
+# ============================================
+# NOTE: LaTeX generation now happens in Python (latex_builder.py)
+# NO MORE LaTeX tasks for agents!
+
+ats_check_task:
+  description: >
+    Read the user profile from: output/user_profile.json
+    Read parsed JD from: output/parsed_jd.json
+    Read selections from: output/selected_experiences.json, output/selected_skills.json
+    
+    Analyze how well the selected content matches the job requirements.
+    
+    Output JSON report:
+    {
+      "coverage_score": 85,
+      "present_keywords": ["Python", "Machine Learning", ...],
+      "missing_keywords": ["Docker", "AWS", ...],
+      "recommendations": "Consider emphasizing cloud experience..."
+    }
+    
+    Write to: output/ats_report.json
+  expected_output: ATS compatibility report JSON
+  agent: ats_checker
+  context:
+    - select_experiences_task
+    - select_skills_task
+    - write_summary_task
+  output_file: output/ats_report.json
+
+privacy_validation_task:
+  description: >
+    Use privacy_guard tool to validate the user profile.
+    
+    Call tool with:
+    - content_path: "output/user_profile.json"
+    - profile_path: "output/user_profile.json"
+    - content_type: "json"
+    - job_description: "{{input.job_description}}"
+    
+    Ensure no sensitive information (SSN, passport, private addresses) is included.
+    
+    Output JSON: {"validation_status": "pass/fail", "issues": [...], "message": "..."}
+    Write result to: output/privacy_validation_report.json
+  expected_output: Privacy validation report JSON
+  agent: privacy_guard
+  context:
+    - profile_validation_task
+  output_file: output/privacy_validation_report.json
+
+tailor_plan_task:
+  description: >
+    Read all generated content and create a final tailoring plan based on user inputs.
+    
+    Read from:
+    - output/selected_experiences.json
+    - output/selected_projects.json
+    - output/selected_skills.json
+    - output/summary_block.json
+    - output/education_block.json
+    - output/ats_report.json
+    - output/template_validation.json (to check if custom template was used)
+    
+    Adapt the plan based on what the user provided:
+    - Profile only: Standard tailoring approach
+    - Custom LaTeX template: Note template usage and any package warnings
+    - Reference PDF(s): Note that AI analyzed the PDF(s) for style matching
+      (Check reference_pdf_count in inputs to see how many PDFs were provided)
+    
+    Create a summary plan showing what was selected and why.
+    If custom template has missing packages, include prominent warnings.
+    If reference PDFs were provided, note that they were analyzed for style insights.
+    
+    Output JSON format:
+    {
+      "plan": {
+        "mode": "standard" | "custom_template" | "with_reference",
+        "experiences_count": 4,
+        "projects_count": 3,
+        "skills_count": 10,
+        "template_status": "default" | "custom" | "custom_with_warnings",
+        "warnings": ["Missing package: fontawesome5", ...],
+        "reasoning": "Selected experiences emphasize ML/AI background which matches job requirements..."
+      }
+    }
+    
+    Write to: output/tailor_plan.json
+  expected_output: Tailoring plan summary JSON with mode detection
+  agent: planner
+  context:
+    - select_experiences_task
+    - select_projects_task
+    - select_skills_task
+    - write_summary_task
+    - write_education_section_task
+    - ats_check_task
+    - template_validation_task
+  output_file: output/tailor_plan.json

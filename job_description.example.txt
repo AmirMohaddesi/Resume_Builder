@@ -1,0 +1,44 @@
+Sr. Machine Learning Engineer – LLMs, Agent Systems, and Simulation Tooling, Siri Core Modeling
+Sunnyvale, California, United States
+Machine Learning and AI
+
+
+Submit Resume
+Summary
+Posted:
+Nov 03, 2025
+Weekly Hours:
+40
+Role Number:
+200617225-3956
+Join a pioneering team shaping the future of voice-first, agentic platforms. As a Senior Machine Learning Engineer, you’ll help define how next-generation intelligent agents reason, plan, and interact with people through natural voice and multimodal experiences. You will develop the foundations of scalable LLM reasoning systems that will power the next wave of human–AI interaction.
+Description
+We’re seeking a senior ML engineer with strong expertise in large language models and agent-based systems to build the core reasoning and simulation capabilities behind a future platform for agentic voice experiences. You will work on advancing how LLMs plan, adapt, and evaluate actions in realistic environments, contributing to the development of reliable and trustworthy AI agents.
+
+Your work will focus on developing robust infrastructure and tooling for training, simulation, and evaluation of agentic LLMs. You’ll design and run experiments in simulated environments, build scalable evaluation pipelines, and help integrate agent behaviors across client and backend systems. This role is an opportunity to push the boundaries of reasoning, adaptive behavior, and platform architecture for agent-based intelligence.
+
+You will collaborate closely with ML scientists, applied researchers, and product engineers to transform early research into deployable systems. Together, we will shape a platform that empowers developers and end-users to build rich, voice-driven AI experiences.
+Responsibilities
+Design and implement scalable simulation and evaluation frameworks for LLM-based agents
+Collaborate with ML researchers to translate novel reasoning approaches into production-grade systems
+Develop infrastructure for training and experimentation with agentic behaviors
+Integrate agent reasoning capabilities into client-side and backend environments
+Drive iteration speed by creating reliable tooling for experimentation, prototyping, and deployment
+Minimum Qualifications
+Bachelor’s degree in Computer Science, Machine Learning, or related quantitative field, with 4+ years of relevant industry experience
+Strong skills in Python (preferred) and at least one other programming language
+Proven experience in ML engineering, including system design, training pipelines, and deployment workflows
+Deep understanding of agent-based simulation, agentic RAG systems, and LLM evaluation methodologies
+Ability to balance long-term platform vision with pragmatic short-term delivery in fast-paced environments
+Preferred Qualifications
+Experience deploying LLM models in research or production contexts
+Knowledge of adaptive feedback loops, reinforcement learning, or interactive agent design
+Familiarity with client-backend integration for AI-driven applications
+MS or PhD in Computer Science, Machine Learning, or a related field
+Pay & Benefits
+At Apple, base pay is one part of our total compensation package and is determined within a range. This provides the opportunity to progress as you grow and develop within a role. The base pay range for this role is between $147,400 and $272,100, and your base pay will depend on your skills, qualifications, experience, and location.
+
+Apple employees also have the opportunity to become an Apple shareholder through participation in Apple’s discretionary employee stock programs. Apple employees are eligible for discretionary restricted stock unit awards, and can purchase Apple stock at a discount if voluntarily participating in Apple’s Employee Stock Purchase Plan. You’ll also receive benefits including: Comprehensive medical and dental coverage, retirement benefits, a range of discounted products and free services, and for formal education related to advancing your career at Apple, reimbursement for certain educational expenses — including tuition. Additionally, this role might be eligible for discretionary bonuses or commission payments as well as relocation. Learn more about Apple Benefits.
+
+Note: Apple benefit, compensation and employee stock programs are subject to eligibility requirements and other terms of the applicable plan or program.
+Apple is an equal opportunity employer that is committed to inclusion and diversity. We seek to promote equal opportunity for all applicants without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, disability, Veteran status, or other legally protected characteristics. Learn more about your EEO rights as an applicant

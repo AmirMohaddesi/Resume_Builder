@@ -1,0 +1,94 @@
+{
+  "identity": {
+    "first": "Amirhosein",
+    "last": "Mohaddesi",
+    "title": "Robotics & AI Researcher",
+    "email": "amir.mohaddesi@gmail.com",
+    "phone": "9494268113",
+    "website": "https://amirmohaddesi.github.io",
+    "linkedin": "amohaddesi",
+    "github": "amirmohaddesi",
+    "education": [
+      {
+        "school": "University of California, Irvine",
+        "degree": "Ph.D. in Computer Science",
+        "dates": "September 2019 – June 2025",
+        "location": "Irvine, California, United States"
+      },
+      {
+        "school": "Sharif University of Technology",
+        "degree": "B.S. in Computer Engineering",
+        "dates": "2014 – 2019",
+        "location": "Iran"
+      }
+    ]
+  },
+  "experience": [
+    {
+      "organization": "University of California, Irvine",
+      "title": "Graduate Research and Teaching Assistant",
+      "dates": "January 2021 – June 2025",
+      "location": "Irvine, California, United States",
+      "bullets": [
+        "Designed and implemented a ROS2 Humble-based multi‑robot simulation platform for coordination in disaster response.",
+        "Integrated SLAM Toolbox, Nav2, frontier exploration, and map merging into the disaster response platform.",
+        "Extended the platform with imitation learning and reinforcement learning algorithms, documenting results in the PhD dissertation.",
+        "Developed a teleoperation system for Toyota’s Human Support Robot (HSR) enabling remote navigation and manipulation.",
+        "Integrated a ROS2-based control pipeline with real-time feedback from onboard sensors and designed operator interfaces for better responsiveness.",
+        "Enhanced usability of telepresence robots in assistive contexts through improved control and feedback mechanisms.",
+        "Studied Route vs Survey vs Mixed navigation strategies in robot teams, demonstrating that hybrid strategies improve exploration efficiency and completion times.",
+        "Published findings in IEEE and used results to inform adaptive team navigation design."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Multi‑Robot Disaster Response Platform",
+      "bullets": [
+        "Designed a ROS2 Humble-based multi‑robot simulation environment for disaster response coordination.",
+        "Integrated SLAM Toolbox, Nav2, frontier exploration, and map merging to support collaborative exploration.",
+        "Added imitation learning and reinforcement learning capabilities to enable adaptive behavior in robot teams.",
+        "Adopted as a research and teaching tool; results documented in the PhD dissertation."
+      ]
+    },
+    {
+      "name": "Toyota Human Support Robot Teleoperation System",
+      "bullets": [
+        "Developed a teleoperation framework for Toyota’s HSR robot to allow remote navigation and manipulation.",
+        "Implemented a ROS2-based control pipeline with real‑time sensor feedback for responsive operation.",
+        "Designed user interfaces to improve operator control and usability in assistive contexts."
+      ]
+    },
+    {
+      "name": "Human‑Inspired Navigation Strategies in Robot Teams",
+      "bullets": [
+        "Investigated Route, Survey and Mixed navigation strategies for multi‑robot teams.",
+        "Demonstrated that hybrid strategies improve exploration efficiency and completion times compared to single‑strategy approaches.",
+        "Published results in IEEE proceedings to guide adaptive navigation designs."
+      ]
+    }
+  ],
+  "skills": [
+    "Gradio",
+    "OpenAI API",
+    "Hugging Face Spaces",
+    "ROS2",
+    "SLAM",
+    "Nav2",
+    "frontier exploration",
+    "map merging",
+    "imitation learning",
+    "reinforcement learning",
+    "Python",
+    "C++",
+    "PyTorch",
+    "Gazebo",
+    "RViz",
+    "ROS"
+  ],
+  "awards": [
+    "Silver Medal of National Physics Olympiad",
+    "10K Dean's award",
+    "ICPC 2017"
+  ]
+}
