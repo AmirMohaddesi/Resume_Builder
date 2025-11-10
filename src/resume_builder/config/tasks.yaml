@@ -7,16 +7,24 @@
 
 profile_validation_task:
   description: >
-    Use the profile_reader tool to read: output/user_profile.json
+    Validate the user profile at output/user_profile.json.
     
-    Check that it has:
-    - identity.first
-    - identity.last
-    - identity.email
+    Steps:
+    1. Use profile_reader tool with profile_path="output/user_profile.json" to read the profile
+    2. Extract the profile data from the tool's JSON response (look for the "profile" field in the response)
+    3. Check if the profile has these required fields in identity:
+       - first (first name)
+       - last (last name)  
+       - email (email address)
+    4. Create a validation result JSON and write it to output/validated_profile.json:
+       {
+         "validation_status": "success" if all fields present, otherwise "failed",
+         "message": "Profile validation completed. All required fields present." or "Profile missing required fields: [list]",
+         "missing_fields": [] if success, or ["field1", "field2"] if failed
+       }
     
-    Output JSON to output/validated_profile.json:
-    {"validation_status": "success" or "failed", "message": "..."}
-  expected_output: Validation JSON at output/validated_profile.json
+    IMPORTANT: After calling the tool once and getting the response, immediately proceed to validation and file writing. Do not call the tool again.
+  expected_output: A JSON file at output/validated_profile.json containing validation_status, message, and missing_fields
   agent: profile_validator
   output_file: output/validated_profile.json
 

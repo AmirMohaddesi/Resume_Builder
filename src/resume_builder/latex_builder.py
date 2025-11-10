@@ -223,28 +223,28 @@ class LaTeXBuilder:
         
         # Check if FontAwesome is used
         needs_fontawesome = bool(re.search(r'\\fa[A-Z][a-zA-Z]*', latex_content))
-        has_fontawesome = bool(re.search(r'\\usepackage.*\{fontawesome', latex_content))
+        has_fontawesome = bool(re.search(r'\\usepackage[^\n]*\{fontawesome', latex_content, re.IGNORECASE))
         
         # Also check for commented-out fontawesome5 (handle various comment patterns)
-        if not has_fontawesome:
-            # Pattern 1: % \usepackage{fontawesome5} (comment on same line)
-            if re.search(r'%\s*\\usepackage.*\{fontawesome5\}', latex_content):
-                latex_content = re.sub(
-                    r'%\s*(\\usepackage.*\{fontawesome5\})',
-                    r'\1',
-                    latex_content
-                )
-                has_fontawesome = True
-            # Pattern 2: % on separate line before \usepackage{fontawesome5}
-            elif re.search(r'%\s*.*\n\s*%\s*\\usepackage.*\{fontawesome5\}', latex_content, re.MULTILINE):
-                # Uncomment the usepackage line (remove the % before \usepackage)
-                latex_content = re.sub(
-                    r'%\s*(\\usepackage.*\{fontawesome5\})',
-                    r'\1',
-                    latex_content,
-                    flags=re.MULTILINE
-                )
-                has_fontawesome = True
+        # This must happen BEFORE we check if we need to add it, because we want to uncomment if it exists
+        if needs_fontawesome and not has_fontawesome:
+            # Try to uncomment commented fontawesome5 lines
+            lines = latex_content.split('\n')
+            for i, line in enumerate(lines):
+                # Match patterns like: % \usepackage{fontawesome5} or %\usepackage{fontawesome5} or % If you really want the icons (\faMobile etc.), uncomment:\n% \usepackage{fontawesome5}
+                if 'fontawesome5' in line.lower() and '%' in line and 'usepackage' in line.lower():
+                    # Remove the % and any whitespace immediately after it, but preserve leading whitespace
+                    # Match: optional leading whitespace, then %, then optional whitespace, then \usepackage
+                    uncommented = re.sub(r'^(\s*)%\s*', r'\1', line)
+                    if uncommented != line:  # Only replace if we actually uncommented something
+                        lines[i] = uncommented
+                        has_fontawesome = True
+                        break  # Only uncomment the first match
+            
+            if has_fontawesome:
+                latex_content = '\n'.join(lines)
+                # Re-check to confirm it's now uncommented
+                has_fontawesome = bool(re.search(r'\\usepackage[^\n]*\{fontawesome', latex_content, re.IGNORECASE))
         
         # Find the position to insert packages (after \usepackage{hyperref} or similar)
         insert_pos = -1
@@ -293,8 +293,12 @@ class LaTeXBuilder:
                 latex_content = latex_content[:insert_pos] + packages_str + latex_content[insert_pos:]
         
         # Fix font expansion issue with FontAwesome
-        # If fontawesome5 is used, disable font expansion to avoid pdfTeX errors
-        if needs_fontawesome:
+        # ALWAYS disable font expansion if FontAwesome is detected (either already in template or just added)
+        # This prevents pdfTeX from trying to expand FontAwesome fonts (which aren't scalable)
+        # Re-check after uncommenting
+        has_fontawesome = bool(re.search(r'\\usepackage[^\n]*\{fontawesome', latex_content, re.IGNORECASE))
+        
+        if has_fontawesome or needs_fontawesome:
             # Check if microtype is loaded
             if re.search(r'\\usepackage.*\{microtype\}', latex_content):
                 # Disable expansion in microtype
@@ -303,23 +307,23 @@ class LaTeXBuilder:
                     r'\\usepackage[expansion=false]{microtype}',
                     latex_content
                 )
-            else:
-                # Add microtype with expansion disabled to prevent conflicts
-                # Find where to insert (after fontawesome5)
-                fa_match = re.search(r'\\usepackage.*\{fontawesome5\}', latex_content)
-                if fa_match:
-                    insert_after_fa = fa_match.end()
-                    latex_content = latex_content[:insert_after_fa] + '\n\\DisableLigatures{encoding = *, family = * }' + latex_content[insert_after_fa:]
             
-            # Add command to disable font expansion globally to fix MiKTeX font expansion error
-            # This prevents pdfTeX from trying to expand FontAwesome fonts (which aren't scalable)
+            # CRITICAL: Disable font expansion VERY EARLY - right after \documentclass
+            # This must be done BEFORE any packages are loaded to prevent font expansion errors
             if '\\pdfprotrudechars' not in latex_content:
-                # Add before \begin{document}
-                doc_start = latex_content.find('\\begin{document}')
-                if doc_start != -1:
-                    # Disable font expansion globally
-                    disable_expansion = '\n% Disable font expansion to fix FontAwesome compatibility with MiKTeX\n\\pdfprotrudechars=0\n\\pdfadjustspacing=0\n'
-                    latex_content = latex_content[:doc_start] + disable_expansion + latex_content[doc_start:]
+                # Find \documentclass and insert font expansion disabling right after it
+                docclass_match = re.search(r'\\documentclass[^\n]*\n', latex_content)
+                if docclass_match:
+                    # Insert right after documentclass line
+                    insert_pos = docclass_match.end()
+                    disable_expansion = '% Disable font expansion to fix FontAwesome compatibility with MiKTeX\n\\pdfprotrudechars=0\n\\pdfadjustspacing=0\n'
+                    latex_content = latex_content[:insert_pos] + disable_expansion + latex_content[insert_pos:]
+                else:
+                    # Fallback: before \begin{document} if documentclass not found
+                    doc_start = latex_content.find('\\begin{document}')
+                    if doc_start != -1:
+                        disable_expansion = '\n% Disable font expansion to fix FontAwesome compatibility with MiKTeX\n\\pdfprotrudechars=0\n\\pdfadjustspacing=0\n'
+                        latex_content = latex_content[:doc_start] + disable_expansion + latex_content[doc_start:]
         
         return latex_content
     

@@ -153,6 +153,6 @@ class ResumeTeam:
             process=Process.sequential,
             memory=False,  # Disabled for speed
             verbose=True,
-            max_iter=3,
+            max_iter=15,  # Increased to allow tool calls + processing
             max_execution_time=180,  # 3 minute timeout
         )

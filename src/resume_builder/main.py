@@ -51,7 +51,7 @@ def _ensure_output_dir() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def run_pipeline(jd_text: str, profile_path: Optional[str], custom_template_path: Optional[str] = None, reference_pdf_paths: Optional[list] = None) -> Tuple[Optional[str], str]:
+def run_pipeline(jd_text: str, profile_path: Optional[str], custom_template_path: Optional[str] = None, reference_pdf_paths: Optional[list] = None, progress_callback=None) -> Tuple[Optional[str], str]:
     """
     Run the full resume generation pipeline.
     
@@ -137,9 +137,13 @@ def run_pipeline(jd_text: str, profile_path: Optional[str], custom_template_path
     # Execute crew (agents output JSON, no LaTeX yet)
     try:
         logger.info("Launching crew...")
+        if progress_callback:
+            progress_callback(0.2, desc="AI agents analyzing job description and profile...")
         result = team.crew().kickoff(inputs=inputs)
         logger.info(f"Crew execution completed")
         logger.info(f"Result type: {type(result)}")
+        if progress_callback:
+            progress_callback(0.6, desc="AI agents completed analysis. Generating LaTeX...")
         
     except Exception as e:
         logger.error(f"Crew execution failed: {e}")
@@ -170,6 +174,8 @@ def run_pipeline(jd_text: str, profile_path: Optional[str], custom_template_path
         logger.info("="*80)
         logger.info("Building LaTeX resume from JSON data...")
         logger.info("="*80)
+        if progress_callback:
+            progress_callback(0.7, desc="Building LaTeX resume from AI-generated content...")
         
         from resume_builder.latex_builder import build_resume_from_json_files
         import json
@@ -217,6 +223,8 @@ def run_pipeline(jd_text: str, profile_path: Optional[str], custom_template_path
         logger.info("="*80)
         logger.info("Compiling LaTeX to PDF...")
         logger.info("="*80)
+        if progress_callback:
+            progress_callback(0.85, desc="Compiling LaTeX to PDF...")
         
         from resume_builder.tools.latex_compile import LatexCompileTool
         
@@ -234,6 +242,8 @@ def run_pipeline(jd_text: str, profile_path: Optional[str], custom_template_path
         if FINAL_PDF.exists():
             pdf_size = FINAL_PDF.stat().st_size
             logger.info(f"✅ PDF generated successfully: {FINAL_PDF} ({pdf_size} bytes)")
+            if progress_callback:
+                progress_callback(0.95, desc="✅ PDF compiled successfully!")
             
             # Build success message with warnings if any
             success_msg = f"[success] Resume generated successfully!\n\nMode: {mode}\nOutput: {FINAL_PDF}\n"
@@ -245,7 +255,9 @@ def run_pipeline(jd_text: str, profile_path: Optional[str], custom_template_path
                 success_msg += "\n⚠️ TEMPLATE WARNINGS:\n" + "\n".join(template_warnings)
                 success_msg += "\n\nThe resume was generated but may have compilation issues in other LaTeX environments."
             
-            return str(FINAL_PDF), success_msg
+            # Return absolute path to PDF
+            pdf_absolute_path = str(FINAL_PDF.resolve())
+            return pdf_absolute_path, success_msg
         else:
             logger.error("Compilation finished but no PDF was found")
             return None, f"[error] PDF compilation failed. Check compile.log for details.\n\nCompiler output: {compile_result}"
@@ -385,8 +397,6 @@ def build_ui():
                 show_label=False
             )
         
-        save_profile_btn = gr.Button("💾 Save Profile", variant="secondary", size="lg")
-        profile_status = gr.Textbox(label="Profile Status", interactive=False, lines=1, max_lines=10, show_label=False)
         
         # Section 3: Generate Resume
         gr.Markdown("---")
@@ -499,7 +509,8 @@ def build_ui():
             
             # Build output
             if profile:
-                profile_path = save_profile(profile)
+                # Auto-save profile after parsing (silent, no path shown to user)
+                save_profile(profile)
                 identity = profile.get("identity", {})
                 
                 # Detect dynamic fields
@@ -645,46 +656,63 @@ def build_ui():
                     new_field_name, new_field_value, save_new_field_btn, dynamic_links_state]
         )
         
-        def handle_save_profile(first, last, title_val, email_val, phone_val, 
+        def auto_save_profile(first, last, title_val, email_val, phone_val, 
                               website_val, linkedin_val, github_val,
                               exp_json, edu_json, skills, proj_json, awards,
                               dyn_field_1, dyn_field_2, dyn_field_3, dyn_field_4, dyn_field_5,
                               dyn_state):
+            """Auto-save profile when fields change (silent, no UI feedback)."""
             if not PROFILE_BUILDER_AVAILABLE:
-                return "❌ Profile builder not available."
+                return
             
-            # Merge dynamic fields with their values
-            additional_links = {}
-            if dyn_state:
-                for field_id, field_info in dyn_state.items():
-                    additional_links[field_id] = field_info
+            # Only save if we have at least a name
+            if not (first.strip() or last.strip()):
+                return
             
-            profile, msg = build_profile_from_form(
-                first, last, title_val, email_val, phone_val,
-                website_val, linkedin_val, github_val,
-                exp_json, edu_json, skills, proj_json, awards,
-                additional_links
-            )
-            if profile:
-                profile_path = save_profile(profile)
-                return f"✅ {msg}\nSaved to: {profile_path}\n\n💡 Now paste your job description below and click 'Generate Resume'!"
-            else:
-                return f"❌ {msg}"
+            try:
+                # Merge dynamic fields with their values
+                additional_links = {}
+                if dyn_state:
+                    for field_id, field_info in dyn_state.items():
+                        additional_links[field_id] = field_info
+                
+                profile, _ = build_profile_from_form(
+                    first, last, title_val, email_val, phone_val,
+                    website_val, linkedin_val, github_val,
+                    exp_json, edu_json, skills, proj_json, awards,
+                    additional_links
+                )
+                if profile:
+                    save_profile(profile)
+            except Exception:
+                pass  # Silent failure for auto-save
         
-        save_profile_btn.click(
-            handle_save_profile,
-            inputs=[first_name, last_name, title, email, phone, website, linkedin, github,
-                    experience_json, education_json, skills_text, projects_json, awards_text,
-                    dynamic_field_1, dynamic_field_2, dynamic_field_3, dynamic_field_4, dynamic_field_5,
-                    dynamic_links_state],
-            outputs=[profile_status]
-        )
+        # Auto-save profile when any field changes
+        # Use a debounced approach - save after user stops typing
+        all_profile_inputs = [
+            first_name, last_name, title, email, phone, website, linkedin, github,
+            experience_json, education_json, skills_text, projects_json, awards_text,
+            dynamic_field_1, dynamic_field_2, dynamic_field_3, dynamic_field_4, dynamic_field_5,
+            dynamic_links_state
+        ]
+        
+        # Attach auto-save to all profile fields
+        for field in all_profile_inputs:
+            if hasattr(field, 'change'):
+                field.change(
+                    auto_save_profile,
+                    inputs=all_profile_inputs,
+                    outputs=[],
+                    show_progress=False
+                )
         
         async def handle_generate(jd, uploaded_files, progress=gr.Progress()):
             if not jd.strip():
                 return None, None, "❌ Please paste a job description."
             
             import shutil
+            
+            progress(0.05, desc="Processing uploaded files...")
             
             # Separate uploaded files by type
             custom_template_path = None
@@ -722,22 +750,39 @@ def build_ui():
             if not profile_path.exists():
                 profile_path = DEFAULT_PROFILE_PATH
             
-            # Show progress
-            progress(0.1, desc="Starting pipeline...")
+            progress(0.1, desc="Initializing AI agents...")
             
-            # Run pipeline with list of PDFs
+            # Create a progress callback function that can be used in run_pipeline
+            def update_progress(step: float, desc: str):
+                """Update progress from within run_pipeline"""
+                try:
+                    progress(step, desc=desc)
+                except Exception:
+                    pass  # Ignore progress update errors
+            
+            # Run pipeline with list of PDFs and progress callback
             import asyncio
             loop = asyncio.get_event_loop()
-            pdf_path, msg = await loop.run_in_executor(
-                None,
-                run_pipeline,
-                jd,
-                str(profile_path),
-                str(custom_template_path) if custom_template_path else None,
-                reference_pdfs if reference_pdfs else None
-            )
             
-            progress(1.0, desc="Complete!")
+            # Wrap run_pipeline to accept progress callback
+            def run_with_progress():
+                return run_pipeline(
+                    jd,
+                    str(profile_path),
+                    str(custom_template_path) if custom_template_path else None,
+                    reference_pdfs if reference_pdfs else None,
+                    progress_callback=update_progress
+                )
+            
+            pdf_path, msg = await loop.run_in_executor(None, run_with_progress)
+            
+            progress(0.95, desc="Finalizing...")
+            
+            # Check if PDF was actually generated
+            if pdf_path and Path(pdf_path).exists():
+                progress(1.0, desc="✅ Complete! PDF generated successfully.")
+            else:
+                progress(1.0, desc="⚠️ Pipeline completed but PDF not generated. Check status message.")
             
             tex_path = OUTPUT_DIR / "rendered_resume.tex"
             tex_file_path = str(tex_path) if tex_path.exists() else None
