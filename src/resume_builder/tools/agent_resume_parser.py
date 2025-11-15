@@ -36,7 +36,7 @@ def parse_resume_with_agent(resume_path: str | Path) -> Dict[str, Any]:
         backstory="""You are an expert at parsing resumes and extracting structured information.
         You are meticulous about:
         - Email addresses: Remove any leading digits or phone number fragments. 
-          Example: "426-8113Eamir.mohaddesi@gmail.com" should become "amir.mohaddesi@gmail.com"
+          Example: "426-8113Ejohn.doe@gmail.com" should become "john.doe@gmail.com"
         - Phone numbers: Only extract actual phone numbers (7-15 digits), not years (2024), IDs, or dates
         - Names: Extract first and last name correctly
         - URLs: CRITICAL - Only extract URLs that are EXPLICITLY present in the resume text.
@@ -100,8 +100,8 @@ def parse_resume_with_agent(resume_path: str | Path) -> Dict[str, Any]:
         }}
         
         CRITICAL EXTRACTION RULES:
-        1. Email: If you see something like "426-8113Eamir.mohaddesi@gmail.com", 
-           the email should be "amir.mohaddesi@gmail.com" (remove phone fragments and extra letters)
+        1. Email: If you see something like "426-8113Ejohn.doe@gmail.com", 
+           the email should be "john.doe@gmail.com" (remove phone fragments and extra letters)
         2. Phone: Only extract actual phone numbers (7-15 digits). Do NOT extract:
            - Years like "2024" or "2023"
            - IDs or other numeric patterns
@@ -113,11 +113,11 @@ def parse_resume_with_agent(resume_path: str | Path) -> Dict[str, Any]:
            - Plain domains that appear to be websites: example.com, yourname.com (add https:// prefix)
            
            Do NOT invent URLs based on:
-           - Email addresses (amir@gmail.com does NOT mean website is gmail.com)
-           - Names alone without a domain (Amir Mohaddesi does NOT mean website is mohaddesi.com)
+           - Email addresses (john@gmail.com does NOT mean website is gmail.com)
+           - Names alone without a domain (John Doe does NOT mean website is johndoe.com)
            
            Skip common email/social domains: gmail.com, yahoo.com, facebook.com, etc.
-           Include personal portfolio domains like: johndoe.com, mohaddesi.com, myportfolio.io, etc.
+           Include personal portfolio domains like: johndoe.com, janedoe.com, myportfolio.io, etc.
         4. Education: CRITICAL - Education MUST be placed inside identity.education (not at top level).
            Extract ALL education entries you find. Look for sections titled "Education", "Academic Background", 
            "Educational Background", or similar. Each entry should have:

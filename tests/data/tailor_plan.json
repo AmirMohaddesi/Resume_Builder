@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "status": "success",
+  "message": "Tailoring plan created successfully",
+  "mode": "standard",
+  "plan": {
+    "mode": "standard",
+    "experiences_count": 4,
+    "projects_count": 3,
+    "skills_count": 10,
+    "template_status": "default",
+    "cover_letter_generated": true,
+    "warnings": [],
+    "reasoning": "Selected experiences emphasize ML/AI background which matches job requirements for AI Engineer role. Prioritized recent roles with relevant technologies (PyTorch, ROS2) mentioned in job description."
+  }
+}
+

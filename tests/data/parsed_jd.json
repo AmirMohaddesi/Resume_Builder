@@ -1,0 +1,22 @@
+{
+  "status": "success",
+  "message": "Job description parsed successfully",
+  "title": "Senior Software Engineer",
+  "company": "Tech Corp",
+  "location": "San Francisco, CA",
+  "skills": [
+    "Python",
+    "Machine Learning",
+    "PyTorch",
+    "Docker",
+    "AWS"
+  ],
+  "keywords": [
+    "agile",
+    "scrum",
+    "microservices",
+    "cloud-native"
+  ],
+  "cleaned_text": "We are looking for a Senior Software Engineer with experience in Python, machine learning, and cloud technologies. The ideal candidate will have 5+ years of experience with ML frameworks like PyTorch and experience deploying services on AWS."
+}
+

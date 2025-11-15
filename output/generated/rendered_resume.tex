@@ -1,0 +1,70 @@
+\documentclass[11pt,a4paper]{resumecv}
+
+\usepackage{fontawesome5}
+\nopagenumbers
+% Note: geometry, hyperref, xcolor, inputenc, enumitem, multicol, ragged2e are already loaded by resumecv.cls
+% Only add packages that are NOT already loaded by the class
+% fontawesome5 will be added automatically by _post_process_latex if \fa... commands are detected
+% Use XeLaTeX if you want emoji in the header
+\usepackage{amssymb}
+
+% --- Widen layout & fix ModernCV/resumecv mix ---
+% Do NOT use \moderncvstyle/\moderncvcolor with "resumecv" (remove if present)
+% Widen page margins (resumecv already loads geometry; override after class)
+\geometry{margin=0.75in}
+
+% Gentler lists and fewer breaks to pull content up (tighter spacing for more content)
+\setlist[itemize]{leftmargin=*, labelsep=0.5em, topsep=.15em, itemsep=.15em, parsep=0em}
+
+% Ease line-breaking so LaTeX hyphenates less aggressively without overfull boxes
+\sloppy
+\emergencystretch=3em
+
+\name{Amirhosein}{Mohaddesi}
+\email{amir.mohaddesi@gmail.com}
+\phone{(949) 426-8113}
+\homepage{https://amirmohaddesi.github.io/}
+\social[linkedin]{amohaddesi}
+\social[github]{AmirMohaddesi}
+
+\begin{document}
+\makecvtitle
+
+\begin{center} \textbf{automated software testing software quality testing pipelines mentoring technical decision-making} \end{center}
+\begin{center}\begin{tabular}{ c c c c }
+\enspace\faMobile\enspace (949) 426-8113 & \multicolumn{2}{c} {$\mathbb{E}$}\enspace {amir.mohaddesi@gmail.com} & \enspace\faHome\enspace Irvine, CA, USA & \phantom{} \\
+\hline
+\color{blue} {$\mathbb{W}$} \href{https://amirmohaddesi.github.io/}{Personal Website} & \enspace\faLinkedin\enspace \color{blue} \href{https://www.linkedin.com/in/amohaddesi}{amohaddesi} & \enspace\faGithub\enspace \color{blue} \href{https://github.com/AmirMohaddesi}{AmirMohaddesi} & {$\mathbb{G}$}\enspace \color{blue} \href{https://scholar.google.com/citations?user=goi591YAAAAJ&hl=en}{Google Scholar} \\
+\end{{tabular}}\end{{center}}
+
+\section*{Summary}
+Software developer with over 4 years of experience specializing in simulation platform development and embedded neural network models. Built a multi-robot simulation platform using ROS2 integrating C++ and Python, and developed an 8-bit quantized spiking neural network for power-efficient deployment. Skilled in Python, C++, object-oriented programming, algorithm design, and Linux.
+
+
+\section*{Experience}
+\cventry{Sep 2021 - Jun 2025}{Graduate Researcher}{CARL Lab, University of California, Irvine}{}{}{\begin{itemize}[leftmargin=*,labelsep=0.5em,itemsep=0pt]
+  \item Built a multi-robot simulation platform in ROS2 to study human-inspired navigation strategies and integrated C++ and Python nodes for navigation, mapping, and data logging.
+\end{itemize}}
+
+\cventry{Jul 2020 - Jul 2021}{Assistant}{NMI Lab, University of California, Irvine}{}{}{\begin{itemize}[leftmargin=*,labelsep=0.5em,itemsep=0pt]
+  \item Developed an 8-bit quantized spiking neural network for power-efficient embedded deployment with a custom quantization technique.
+\end{itemize}}
+
+
+\section*{Education}
+\cventry{Sep 2019 – Jun 2025}{Ph.D. in Information and Computer Science}{University of California, Irvine}{Irvine, CA, USA}{}{}
+
+\cventry{Sep 2015 – Jun 2019}{B.S. in Computer Engineering}{Sharif University of Technology}{Tehran, Iran}{}{}
+
+
+\section*{Skills}
+\begin{sloppypar}Python, C++, Bash, Linux (Ubuntu), Git, Docker, SQL, object-oriented programming, object-oriented design, data structures, algorithm design\end{sloppypar}
+
+
+\section*{Projects}
+\cvitem{~}{\textbf{Alter Ego: Personalized Conversational AI}: Designed and deployed a conversational AI agent that represents my professional background and research expertise, built using Python, Gradio, and the OpenAI API with local persona embeddings.}
+\cvitem{~}{\textbf{Multi-Robot Coordination and Distributed Control System}: Built a ROS2 Humble-based simulation platform for multi-robot coordination in disaster-response environments, integrated SLAM Toolbox, Nav2, map\_merge, and frontier exploration.}
+\cvitem{~}{\textbf{Benefits of Varying Navigation Strategies in Teams of Robots}: Investigated how Route, Survey, and Mixed strategies affect multi-robot team efficiency in ROS2 and Webots.}
+
+
+\end{document}

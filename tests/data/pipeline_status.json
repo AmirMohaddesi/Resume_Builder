@@ -1,0 +1,34 @@
+{
+  "ok": true,
+  "status": "ready",
+  "ready_for_latex": true,
+  "message": "All required phases completed; safe to build LaTeX.",
+  "blocking_errors": [],
+  "warnings": [
+    "Template missing fontawesome5; using fallback icons"
+  ],
+  "phase_status": {
+    "preflight_task": "skipped",
+    "profile_validation_task": "success",
+    "collect_file_info_task": "success",
+    "template_validation_task": "warning",
+    "parse_job_description_task": "success",
+    "select_experiences_task": "success",
+    "select_projects_task": "success",
+    "select_skills_task": "success",
+    "write_summary_task": "success",
+    "write_education_section_task": "success",
+    "ats_check_task": "success",
+    "privacy_validation_task": "success",
+    "write_cover_letter_task": "success"
+  },
+  "what_was_skipped_and_why": [
+    {
+      "phase": "preflight_task",
+      "reason": "Handled separately in Python or not required in this run"
+    }
+  ],
+  "mode": "standard",
+  "self_test": "passed"
+}
+

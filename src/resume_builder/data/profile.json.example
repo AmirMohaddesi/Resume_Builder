@@ -1,0 +1,56 @@
+{
+  "identity": {
+    "first": "John",
+    "last": "Doe",
+    "title": "Software Engineer",
+    "email": "john.doe@example.com",
+    "phone": "555-123-4567",
+    "website": "https://johndoe.dev",
+    "linkedin": "johndoe",
+    "github": "johndoe",
+    "education": [
+      {
+        "school": "University of Example",
+        "degree": "B.S. in Computer Science",
+        "dates": "2018 – 2022",
+        "location": "City, State, Country"
+      }
+    ]
+  },
+  "experience": [
+    {
+      "organization": "Example Company",
+      "title": "Software Engineer",
+      "dates": "2022 – Present",
+      "location": "City, State, Country",
+      "bullets": [
+        "Developed and maintained web applications using modern frameworks",
+        "Collaborated with cross-functional teams to deliver high-quality software",
+        "Implemented automated testing and CI/CD pipelines"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Example Project",
+      "bullets": [
+        "Built a web application using React and Node.js",
+        "Deployed to cloud infrastructure with Docker",
+        "Open source project with 100+ GitHub stars"
+      ]
+    }
+  ],
+  "skills": [
+    "Python",
+    "JavaScript",
+    "React",
+    "Node.js",
+    "Docker",
+    "AWS"
+  ],
+  "awards": [
+    "Dean's List",
+    "Hackathon Winner"
+  ]
+}
+

@@ -22,6 +22,8 @@ from typing import Dict, Any, Type
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field, ConfigDict
 
+from resume_builder.utils import clean_markdown_fences
+
 # Try to import logger, fallback to None if not available
 try:
     from resume_builder.logger import get_logger
@@ -37,7 +39,7 @@ class LatexCompileInput(BaseModel):
     out_name: str = Field(default="resume.pdf", description="Filename of the generated PDF.")
     # Accept optional extras from tasks.yaml to avoid validation/type errors
     workdir: str | None = Field(default=None, description="Optional working directory (ignored).")
-    engine: str | None = Field(default=None, description="LaTeX engine hint (ignored; uses pdflatex).")
+    engine: str | None = Field(default="auto", description="LaTeX engine: 'pdflatex', 'xelatex', or 'auto' (detects Unicode and uses xelatex if needed).")
     log_path: str | None = Field(default=None, description="Optional compile log path (ignored by tool).")
     model_config = ConfigDict(extra="ignore")
 
@@ -90,7 +92,7 @@ class LatexCompileTool(BaseTool):
             return "\n\n--- EXTRACTED ERRORS ---\n\n" + "\n\n".join(errors[:5])  # Limit to 5 errors
         return ""
 
-    def _run(self, tex_path: str, out_name: str = "resume.pdf", log_path: str | None = None, **_: Any) -> Dict[str, Any]:  # type: ignore[override]
+    def _run(self, tex_path: str, out_name: str = "resume.pdf", log_path: str | None = None, engine: str | None = None, **kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
         logger.info(f"Starting LaTeX compilation: {tex_path} -> {out_name}")
         tex = Path(tex_path).resolve()
         logger.debug(f"Resolved LaTeX path: {tex}")
@@ -130,7 +132,7 @@ class LatexCompileTool(BaseTool):
         
         # Find project root starting from the tex file location
         project_root = find_project_root(tex.parent)
-        output_dir = project_root / "output"
+        output_dir = project_root / "output" / "generated"
         output_dir.mkdir(exist_ok=True, parents=True)
         
         # Ensure output_dir is absolute and doesn't create nested paths
@@ -153,36 +155,90 @@ class LatexCompileTool(BaseTool):
         logger.debug(f"Project root: {project_root}")
         logger.debug(f"Output directory: {output_dir}, Log path: {compile_log_path}")
         
-        # Check if pdflatex is available
-        logger.debug("Checking for pdflatex...")
+        # Read LaTeX content early to check for Unicode (needed for engine selection)
+        tex_content = tex.read_text(encoding="utf-8")
+        
+        # Determine which engine to use
+        engine_param = engine if engine is not None else kwargs.get('engine', 'auto')
+        if engine_param is None:
+            engine_param = 'auto'
+        
+        # Auto-detect: if content has Unicode emojis, prefer xelatex
+        use_xelatex = False
+        if engine_param == 'auto':
+            # Check for Unicode emojis (common ones: 📞 📧 🌐 🔗 💻 🎓 🏠)
+            unicode_emoji_pattern = r'[📞📧🌐🔗💻🎓🏠📍]'
+            if re.search(unicode_emoji_pattern, tex_content):
+                logger.info("Unicode emojis detected, will try xelatex first")
+                use_xelatex = True
+        elif engine_param.lower() == 'xelatex':
+            use_xelatex = True
+        
+        # Check for available LaTeX engines
+        engine_name = "xelatex" if use_xelatex else "pdflatex"
+        logger.debug(f"Checking for {engine_name}...")
+        
         try:
             result = subprocess.run(
-                ["pdflatex", "--version"],
+                [engine_name, "--version"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=5,
                 check=True,
             )
-            logger.debug(f"pdflatex found: {result.stdout.decode()[:50]}...")
+            # Handle both bytes and string stdout
+            stdout_text = result.stdout.decode('utf-8', errors='replace') if isinstance(result.stdout, bytes) else result.stdout
+            logger.debug(f"{engine_name} found: {stdout_text[:50]}...")
         except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
-            error_msg = "pdflatex not found. Please install a LaTeX distribution (e.g., MiKTeX or TeX Live). See INSTALL_LATEX.md for instructions."
-            logger.error(f"pdflatex check failed: {e}")
-            # Remove any existing corrupted PDF
-            final_path = output_dir / out_name
-            if final_path.exists():
-                final_path.unlink()
-                logger.debug(f"Removed existing PDF: {final_path}")
-            try:
-                compile_log_path.write_text(error_msg, encoding="utf-8")
-            except Exception:
-                pass
-            # Raise exception so agent sees the error
-            raise RuntimeError(error_msg)
+            # If xelatex not found, fall back to pdflatex
+            if use_xelatex:
+                logger.warning(f"{engine_name} not found, falling back to pdflatex")
+                use_xelatex = False
+                engine_name = "pdflatex"
+                try:
+                    result = subprocess.run(
+                        ["pdflatex", "--version"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=5,
+                        check=True,
+                    )
+                    # Handle both bytes and string stdout
+                    stdout_text = result.stdout.decode('utf-8', errors='replace') if isinstance(result.stdout, bytes) else result.stdout
+                    logger.debug(f"pdflatex found: {stdout_text[:50]}...")
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e2:
+                    error_msg = "pdflatex not found. Please install a LaTeX distribution (e.g., MiKTeX or TeX Live). See INSTALL_LATEX.md for instructions."
+                    logger.error(f"pdflatex check failed: {e2}")
+                    # Remove any existing corrupted PDF
+                    final_path = output_dir / out_name
+                    if final_path.exists():
+                        final_path.unlink()
+                        logger.debug(f"Removed existing PDF: {final_path}")
+                    try:
+                        compile_log_path.write_text(error_msg, encoding="utf-8")
+                    except Exception:
+                        pass
+                    # Raise exception so agent sees the error
+                    raise RuntimeError(error_msg)
+            else:
+                error_msg = "pdflatex not found. Please install a LaTeX distribution (e.g., MiKTeX or TeX Live). See INSTALL_LATEX.md for instructions."
+                logger.error(f"pdflatex check failed: {e}")
+                # Remove any existing corrupted PDF
+                final_path = output_dir / out_name
+                if final_path.exists():
+                    final_path.unlink()
+                    logger.debug(f"Removed existing PDF: {final_path}")
+                try:
+                    compile_log_path.write_text(error_msg, encoding="utf-8")
+                except Exception:
+                    pass
+                # Raise exception so agent sees the error
+                raise RuntimeError(error_msg)
         
         # Clean the LaTeX file - remove markdown code fences if present
-        logger.debug("Reading and cleaning LaTeX content...")
-        tex_content = tex.read_text(encoding="utf-8")
+        logger.debug("Cleaning LaTeX content...")
         original_size = len(tex_content)
+        original_content = tex_content
         
         # Fix escaped newlines (common LLM mistake: generates \n instead of real newlines)
         if "\\n" in tex_content and tex_content.count("\\n") > 5:
@@ -194,16 +250,8 @@ class LatexCompileTool(BaseTool):
             logger.info("Fixed escaped newlines in LaTeX content")
         
         # Remove markdown code fences (```latex and ```)
-        if tex_content.startswith("```"):
-            logger.warning("Found markdown code fences, removing...")
-            lines = tex_content.split("\n")
-            # Remove first line if it's a code fence
-            if lines[0].strip().startswith("```"):
-                lines = lines[1:]
-            # Remove last line if it's a code fence
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            tex_content = "\n".join(lines)
+        tex_content = clean_markdown_fences(tex_content)
+        if tex_content != original_content:
             logger.info("Removed markdown code fences")
         
         if len(tex_content) != original_size:
@@ -224,8 +272,15 @@ class LatexCompileTool(BaseTool):
                 if f.is_file() and f != tex:
                     shutil.copy(f, work / f.name)
             
+            # Copy resumecv.cls class file if it exists in templates directory
+            templates_dir = project_root / "src" / "resume_builder" / "templates"
+            class_file = templates_dir / "resumecv.cls"
+            if class_file.exists():
+                shutil.copy(class_file, work / "resumecv.cls")
+                logger.debug(f"Copied resumecv.cls to temp directory")
+            
             command = [
-                "pdflatex",
+                engine_name,
                 "-interaction=nonstopmode",
                 "-no-shell-escape",
                 "-output-directory", str(work),
@@ -234,8 +289,8 @@ class LatexCompileTool(BaseTool):
             
             compilation_log = []
             try:
-                logger.info("Running pdflatex (first pass)...")
-                # Run pdflatex twice to ensure references are resolved
+                logger.info(f"Running {engine_name} (first pass)...")
+                # Run LaTeX engine twice to ensure references are resolved
                 result1 = subprocess.run(
                     command,
                     cwd=work,
@@ -243,12 +298,14 @@ class LatexCompileTool(BaseTool):
                     stderr=subprocess.STDOUT,
                     timeout=60,
                     check=False,
-                    text=True,
+                    text=False,  # Get bytes first, decode manually
                 )
-                compilation_log.append(result1.stdout)
+                # Decode with error handling
+                stdout1 = (result1.stdout.decode('utf-8', errors='replace') if isinstance(result1.stdout, bytes) else result1.stdout) if result1.stdout else ""
+                compilation_log.append(stdout1)
                 logger.debug(f"First pass exit code: {result1.returncode}")
                 
-                logger.info("Running pdflatex (second pass for references)...")
+                logger.info(f"Running {engine_name} (second pass for references)...")
                 result2 = subprocess.run(
                     command,
                     cwd=work,
@@ -256,13 +313,16 @@ class LatexCompileTool(BaseTool):
                     stderr=subprocess.STDOUT,
                     timeout=60,
                     check=False,
-                    text=True,
+                    text=False,  # Get bytes first, decode manually
                 )
-                compilation_log.append(result2.stdout)
+                # Decode with error handling
+                stdout2 = (result2.stdout.decode('utf-8', errors='replace') if isinstance(result2.stdout, bytes) else result2.stdout) if result2.stdout else ""
+                compilation_log.append(stdout2)
                 logger.debug(f"Second pass exit code: {result2.returncode}")
                 
-                # Extract errors from log
-                full_log = "\n\n".join(compilation_log)
+                # Extract errors from log - filter out None values and empty strings
+                compilation_log = [log for log in compilation_log if log is not None and isinstance(log, str)]
+                full_log = "\n\n".join(compilation_log) if compilation_log else "No compilation output captured."
                 extracted_errors = self._extract_latex_errors(full_log)
                 if extracted_errors:
                     logger.warning("LaTeX compilation errors detected:")
@@ -285,9 +345,11 @@ class LatexCompileTool(BaseTool):
                 return {"success": False, "error": "LaTeX compilation timed out"}
             except Exception as e:
                 logger.exception(f"Exception during LaTeX compilation: {e}")
-                # Write whatever we captured
+                # Write whatever we captured - filter out None values
+                safe_log = [log for log in compilation_log if log is not None and isinstance(log, str)]
                 try:
-                    compile_log_path.write_text("\n\n".join(compilation_log + [f"Exception: {e}"]), encoding="utf-8")
+                    error_log = "\n\n".join(safe_log + [f"Exception: {e}"]) if safe_log else f"Exception: {e}"
+                    compile_log_path.write_text(error_log, encoding="utf-8")
                 except Exception:
                     pass
                 return {"success": False, "error": f"Compilation error: {str(e)}"}
@@ -295,7 +357,7 @@ class LatexCompileTool(BaseTool):
             pdf_file = work / f"{tex.stem}.pdf"
             logger.debug(f"Checking for generated PDF: {pdf_file}")
             if not pdf_file.exists():
-                logger.error("PDF file was not generated by pdflatex")
+                logger.error(f"PDF file was not generated by {engine_name}")
                 # Return error log for debugging
                 error_log = "\n".join(compilation_log)
                 extracted_errors = self._extract_latex_errors(error_log)
@@ -304,7 +366,7 @@ class LatexCompileTool(BaseTool):
                 if final_path.exists():
                     final_path.unlink()  # Delete corrupted PDF
                     logger.debug(f"Removed existing PDF: {final_path}")
-                error_msg = f"PDF not generated. pdflatex compilation failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log[-1000:] if error_log else 'No compilation log available. Is pdflatex installed?'}\n\nTIP: Copy the LaTeX content from output/rendered_resume.tex to Overleaf to see detailed errors."
+                error_msg = f"PDF not generated. {engine_name} compilation failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log[-1000:] if error_log else f'No compilation log available. Is {engine_name} installed?'}\n\nTIP: Copy the LaTeX content from output/generated/rendered_resume.tex to Overleaf to see detailed errors."
                 try:
                     compile_log_path.write_text(f"{extracted_errors}\n\n--- FULL LOG ---\n\n{error_log}", encoding="utf-8")
                 except Exception:
@@ -322,7 +384,7 @@ class LatexCompileTool(BaseTool):
                 final_path = output_dir / out_name
                 if final_path.exists():
                     final_path.unlink()  # Delete corrupted PDF
-                error_msg = f"Generated PDF is too small (corrupted). Compilation likely failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log[-1000:] if error_log else 'No compilation log available.'}\n\nTIP: Copy the LaTeX content from output/rendered_resume.tex to Overleaf to see detailed errors."
+                error_msg = f"Generated PDF is too small (corrupted). Compilation likely failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log[-1000:] if error_log else 'No compilation log available.'}\n\nTIP: Copy the LaTeX content from output/generated/rendered_resume.tex to Overleaf to see detailed errors."
                 try:
                     compile_log_path.write_text(f"{extracted_errors}\n\n--- FULL LOG ---\n\n{error_log}", encoding="utf-8")
                 except Exception:
@@ -362,7 +424,15 @@ class LatexCompileTool(BaseTool):
         # Write the PDF bytes to final location
         logger.debug(f"Writing PDF to: {final_path}")
         try:
+            # Write new PDF (old one already removed above)
             final_path.write_bytes(pdf_bytes)
+            # Force file system sync on Unix systems
+            try:
+                import os
+                if hasattr(os, 'sync'):
+                    os.sync()
+            except Exception:
+                pass
             # Verify the write succeeded
             written_size = final_path.stat().st_size if final_path.exists() else 0
             if written_size != pdf_size:
@@ -373,7 +443,9 @@ class LatexCompileTool(BaseTool):
             logger.exception(f"Failed to write PDF to {final_path}: {e}")
             error_msg = f"Failed to copy PDF to {final_path}: {e}\n\nPDF was successfully compiled ({pdf_size} bytes) but copy failed.\nYou can manually copy it or run: python fix_pdf.py"
             try:
-                compile_log_path.write_text(f"{error_msg}\n\n--- COMPILATION LOG ---\n\n{chr(10).join(compilation_log)}", encoding="utf-8")
+                safe_log = [log for log in compilation_log if log is not None and isinstance(log, str)]
+                log_content = chr(10).join(safe_log) if safe_log else "No compilation log available"
+                compile_log_path.write_text(f"{error_msg}\n\n--- COMPILATION LOG ---\n\n{log_content}", encoding="utf-8")
             except Exception:
                 pass
             raise RuntimeError(error_msg)

@@ -1,0 +1,18 @@
+{
+  "experiences": [
+    {
+      "organization": "CARL Lab, UC Irvine",
+      "title": "Graduate Researcher",
+      "location": "Irvine, CA",
+      "dates": "Sep 2021-Jun 2025",
+      "description": "Developed multi-robot simulation platform in ROS2, designed and tested human-inspired navigation strategies."
+    },
+    {
+      "organization": "NMI Lab, UC Irvine",
+      "title": "Assistant",
+      "location": "Irvine, CA",
+      "dates": "Jul 2020-Jul 2021",
+      "description": "Developed 8-bit quantized spiking neural network using PyTorch for embedded deployment. Skills include Python, PyTorch, TensorFlow."
+    }
+  ]
+}

@@ -6,10 +6,44 @@ This guide explains how to configure the AI Resume Builder, including API keys, 
 
 All configuration is done through a `.env` file in the project root. Create this file if it doesn't exist:
 
+### Quick Setup (2 Steps)
+
+**1. Create `.env` file:**
+```bash
+# Copy and edit
+cp .env.example .env
+# Or create manually
+```
+
+**2. Add your API key:**
 ```bash
 # .env file
 OPENAI_API_KEY=your-api-key-here
+
+# LLM Model (Optional - defaults to gpt-4o-mini for cost savings)
+LLM_MODEL=gpt-4o-mini
 ```
+
+That's it! The system will use `gpt-4o-mini` for all agents by default (cost-optimized).
+
+### LLM Model Configuration
+
+**NEW**: You can now set a single LLM model for all agents using the `LLM_MODEL` or `RESUME_BUILDER_LLM` environment variable. This is perfect for cost optimization!
+
+- **Default**: `gpt-4o-mini` (cheapest option, ~$0.15 per 1M input tokens)
+- **Options**: 
+  - `gpt-4o-mini` - Recommended for cost savings (works well with optimized prompts)
+  - `gpt-4o` - Higher quality but more expensive (~$2.50 per 1M input tokens)
+  - `gpt-3.5-turbo` - Older model, cheaper but lower quality
+  - `ollama/llama3.2` - Local model (free, requires Ollama installation)
+
+**Example `.env` file for maximum cost savings:**
+```bash
+OPENAI_API_KEY=your-key-here
+LLM_MODEL=gpt-4o-mini  # All agents use this model
+```
+
+**Note**: Writing tasks (summary, cover letter, header) have been optimized with structured prompts to work well with cheaper models like `gpt-4o-mini`.
 
 ## API Keys
 
@@ -134,6 +168,7 @@ You can change these in `src/resume_builder/config/agents.yaml` by modifying the
 
 ### Optional
 
+- `LLM_MODEL` or `RESUME_BUILDER_LLM` - LLM model for all agents (default: `gpt-4o-mini`). Set this to control costs!
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR). Default: INFO
 - `GRADIO_SERVER_PORT` - Port for Gradio UI. Default: 7860
 - `PORT` - Alternative port variable (used if GRADIO_SERVER_PORT not set)
@@ -150,22 +185,55 @@ You can change these in `src/resume_builder/config/agents.yaml` by modifying the
 
 ## Example .env File
 
+**Minimal setup (recommended for cost savings):**
 ```bash
-# OpenAI (default)
+# 1. REQUIRED: OpenAI API Key
 OPENAI_API_KEY=sk-proj-...
 
-# Or use local Ollama for privacy
-# OLLAMA_BASE_URL=http://localhost:11434
+# 2. OPTIONAL: LLM Model (set to gpt-4o-mini for ~94% cost savings)
+LLM_MODEL=gpt-4o-mini
+```
 
-# Logging
+**Full configuration example:**
+```bash
+# ============================================
+# 1. REQUIRED: OpenAI API Key
+# ============================================
+OPENAI_API_KEY=sk-proj-...
+
+# ============================================
+# 2. OPTIONAL: LLM Model (Cost Control)
+# ============================================
+# Default: gpt-4o-mini (cheapest, ~$0.15 per 1M tokens)
+# Options: gpt-4o-mini, gpt-4o, gpt-3.5-turbo, ollama/llama3.2
+LLM_MODEL=gpt-4o-mini
+
+# Alternative variable name (also supported):
+# RESUME_BUILDER_LLM=gpt-4o-mini
+
+# ============================================
+# 3. OPTIONAL: Logging & Server
+# ============================================
 LOG_LEVEL=INFO
-
-# Server
 GRADIO_SERVER_PORT=7860
 
-# Paths (optional)
-TEMPLATE_PATH=src/resume_builder/templates/main.tex
-PROFILE_PATH=src/resume_builder/data/profile.json
+# ============================================
+# 4. OPTIONAL: CrewAI Settings
+# ============================================
+# CREWAI_TRACING=false
+# CREWAI_VERBOSE=false
+
+# ============================================
+# 5. OPTIONAL: Local Models (Privacy)
+# ============================================
+# OLLAMA_BASE_URL=http://localhost:11434
+# LLM_MODEL=ollama/llama3.2
+
+# ============================================
+# 6. OPTIONAL: Custom Paths
+# ============================================
+# TEMPLATE_PATH=src/resume_builder/templates/main.tex
+# PROFILE_PATH=src/resume_builder/data/profile.json
 ```
 
 ## Privacy Considerations
@@ -193,15 +261,28 @@ For maximum privacy, use local models:
 
 ## Cost Optimization
 
-### Using Smaller Models
+### Using a Single Cheaper Model (Recommended)
 
-Edit `src/resume_builder/config/agents.yaml` to use cheaper models:
+**Easiest way**: Set `LLM_MODEL=gpt-4o-mini` in your `.env` file. This applies to all agents automatically.
+
+**Cost Comparison:**
+- Using `gpt-4o` for all tasks: ~$2.50 per 1M tokens
+- Using `gpt-4o-mini` for all tasks: ~$0.15 per 1M tokens
+- **Savings: ~94%** 🎉
+
+**Writing tasks have been optimized** with structured prompts to work well with `gpt-4o-mini`, so you get great quality at a fraction of the cost!
+
+### Advanced: Per-Agent Configuration
+
+If you need different models for different agents, edit `src/resume_builder/config/agents.yaml`:
 
 ```yaml
 # Change from gpt-4o to gpt-4o-mini for cost savings
 jd_analyst:
   llm: gpt-4o-mini  # Was: gpt-4o
 ```
+
+**Note**: The `LLM_MODEL` environment variable will override individual agent settings.
 
 ### Rate Limiting
 

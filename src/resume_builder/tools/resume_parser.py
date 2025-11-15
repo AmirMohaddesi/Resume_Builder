@@ -35,7 +35,7 @@ def extract_email(text: str) -> Optional[str]:
     email = matches[0]
     
     # Clean up: remove any leading digits/phone fragments that might have been concatenated
-    # Example: "426-8113Eamir.mohaddesi@gmail.com" -> "amir.mohaddesi@gmail.com"
+    # Example: "426-8113Ejohn.doe@gmail.com" -> "john.doe@gmail.com"
     # Strategy: Find @ symbol, work backwards to find where username actually starts
     if '@' in email:
         at_pos = email.find('@')
@@ -49,17 +49,17 @@ def extract_email(text: str) -> Optional[str]:
         
         # If we removed something and the result starts with a letter, use it
         if username_cleaned and username_cleaned[0].isalpha() and len(username_cleaned) > 1:
-            # Special case: If first letter is uppercase and second is lowercase (like "Eamir"),
+            # Special case: If first letter is uppercase and second is lowercase (like "Ejohn"),
             # it might be from phone concatenation. Try to find the actual email start.
             # Common pattern: phone ends with digit, email might start with letter
-            # "426-8113Eamir" -> remove "426-8113" -> "Eamir" but real email might be "amir"
+            # "426-8113Ejohn" -> remove "426-8113" -> "Ejohn" but real email might be "john"
             # Strategy: if first char is uppercase and looks like it might be concatenation artifact,
             # try lowercasing it. But be conservative - only if it's a single uppercase letter.
             if (len(username_cleaned) > 2 and 
                 username_cleaned[0].isupper() and 
                 username_cleaned[1].islower()):
                 # Check if removing the first letter gives us a more reasonable email
-                # (e.g., "Eamir" -> "amir" if "amir" is more common pattern)
+                # (e.g., "Ejohn" -> "john" if "john" is more common pattern)
                 # For now, just lowercase the first letter if it's uppercase
                 username_cleaned = username_cleaned[0].lower() + username_cleaned[1:]
             cleaned_email = username_cleaned + domain_part
@@ -318,7 +318,7 @@ def parse_resume_to_profile(resume_path: str | Path) -> Dict[str, Any]:
         # If no spaces found, try to detect camelCase or concatenated names
         # Look for capital letters that might indicate name boundaries
         if len(name_parts) == 1 and len(first_line_clean) > 5:
-            # Try to split on capital letters (e.g., "AmirhoseinMohaddesi" -> ["Amirhosein", "Mohaddesi"])
+            # Try to split on capital letters (e.g., "JohnDoe" -> ["John", "Doe"])
             camel_case_split = re.findall(r'[A-Z][a-z]+', first_line_clean)
             if len(camel_case_split) >= 2:
                 name_parts = camel_case_split

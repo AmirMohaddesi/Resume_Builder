@@ -1,0 +1,272 @@
+# ARCHIVED TASKS - Not used in current deterministic + Crew pipeline
+# These tasks have been replaced by Python functions in deterministic_pipeline.py
+# or are not currently wired into the runtime pipeline.
+#
+# Kept for reference or future experimentation.
+
+# ============================================
+# REPLACED BY DETERMINISTIC PYTHON FUNCTIONS
+# ============================================
+
+preflight_task:
+  description: >
+    Verify environment before running. Check that LaTeX engine (xelatex preferred, pdflatex fallback) is available
+    and output directories are writable. This is a fast-fail check to catch issues early.
+    
+    IMPORTANT: The resume uses Unicode characters (names, en-dash) and fontawesome5, so xelatex is preferred.
+    If xelatex is not available, fall back to pdflatex (but note that Unicode may cause issues).
+    
+    Steps:
+    1. Use preflight_check tool with require_engine="xelatex" (preferred for Unicode support)
+    2. If xelatex not found, try require_engine="pdflatex" as fallback
+    3. Write result to output/preflight_check.json with ok (bool), engine (path), engine_type (xelatex/pdflatex), 
+       output_dir (path), warning (if fallback used), or error message
+    4. If ok=false, the pipeline runner will abort with clear error message
+    5. If ok=true, proceed with pipeline
+    
+    NOTE: The pipeline runner (main.py) checks this file after crew execution and aborts if ok=false.
+  expected_output: >
+    JSON with ok (bool), engine (path), engine_type (xelatex/pdflatex), unicode_ready (bool), output_dir (path), warning (optional), or error message
+  agent: preflight_sentinel
+  output_file: output/preflight_check.json
+  # REPLACED BY: deterministic_pipeline.run_preflight()
+
+profile_validation_task:
+  description: >
+    progress_reporter(0.15, "Validating profile...")
+    DETERMINISTIC TASK - Use tools only, no LLM reasoning.
+    Read: profile_reader("output/user_profile.json")
+    Check: identity.first, identity.last, identity.email exist using direct field access.
+    Write to output/validated_profile.json: {ok, status: "success"|"error", validation_status: "success"|"failed", message, missing_fields, error_type?, hint?}
+    ⚠️ No explanations, no reasoning, JSON only. Use write_json_file tool.
+  expected_output: >
+    JSON file with status, validation_status, message, missing_fields - no other text
+  agent: profile_validator
+  # REPLACED BY: deterministic_pipeline.validate_profile()
+
+collect_file_info_task:
+  description: >
+    DETERMINISTIC TASK - Use tools only, minimal LLM.
+    Check for output/custom_template.tex. If exists: use tex_info_extractor (NOT read_json_file) to extract contact info. Read profile with profile_reader. Merge into profile.identity. Save to output/user_profile.json.
+    Validate: email REQUIRED (missing → ok=false, status="error"), phone OPTIONAL (missing → ok=true, status="warning").
+    Write to output/file_collection_report.json: {ok, status, tex_file_found, fields_updated, validation: {email_present, phone_present, missing_fields, critical_missing}, recommendations, message}
+    ⚠️ Use tools for extraction/validation. No explanations, JSON only. Use write_json_file tool.
+  expected_output: >
+    JSON report - no other text
+  agent: file_collector
+  context:
+    - profile_validation_task
+  output_file: output/file_collection_report.json
+  # REPLACED BY: deterministic_pipeline.collect_file_info()
+
+template_validation_task:
+  description: >
+    DETERMINISTIC TASK - Use tools only, no LLM reasoning.
+    Check for output/custom_template.tex. If exists: use latex_package_checker (NOT read_json_file) to check fontawesome5, hyperref, geometry. Warn if microtype with resumecv/moderncv. If missing: {"status": "skipped", "message": "No custom template"}.
+    Write to output/template_validation.json: {status, message, template_provided, missing_packages, critical_missing, microtype_warning, recommendations, error_type, hint}
+    ⚠️ Use latex_package_checker for .tex files, write_json_file for output. No explanations, JSON only.
+  expected_output: >
+    JSON with package checks and warnings - no other text
+  agent: template_validator
+  # REPLACED BY: deterministic_pipeline.validate_template()
+
+pipeline_orchestration_task:
+  description: >
+    DETERMINISTIC VALIDATION TASK - Use tools, minimal LLM reasoning.
+    Read all phase outputs using read_json_file("output/[filename].json"). Validate using direct field access, decide readiness, write pipeline_status.json and tailor_plan.json.
+    
+    REQUIRED files: validated_profile.json, file_collection_report.json, selected_experiences.json, selected_skills.json, summary_block.json, education_block.json, header_block.json
+    OPTIONAL files: preflight_check.json, template_validation.json, parsed_jd.json, selected_projects.json, ats_report.json, privacy_validation_report.json, cover_letter.json
+    
+    Rules (apply deterministically):
+    - Missing REQUIRED OR ok=false/status!="success" → blocking_errors, ok=false
+    - file_collection_report: ok=false+status="error" (email missing) → block; ok=true+status="warning" (phone missing) → warnings only, don't block
+    - Missing OPTIONAL → phase_status="skipped", add to what_was_skipped_and_why
+    - mode: template_validation.json exists? "custom_template" : "standard"; +"_with_reference" if has_reference_pdfs
+    
+    ⚠️ IMPORTANT: Track task execution times by analyzing file modification timestamps:
+    - For each task output file, check its modification time
+    - Calculate duration by comparing file timestamps (or use 0 if file doesn't exist)
+    - Use progress_reporter(0.55, "Analyzing task timings...", task_name="pipeline_orchestration_task", task_duration_seconds=X) to report timing
+    - Task mapping: validated_profile.json → profile_validation_task, file_collection_report.json → collect_file_info_task, parsed_jd.json → parse_job_description_task, selected_experiences.json → select_experiences_task, selected_projects.json → select_projects_task, selected_skills.json → select_skills_task, summary_block.json → write_summary_task, education_block.json → write_education_section_task, header_block.json → write_header_task, ats_report.json → ats_check_task, privacy_validation_report.json → privacy_validation_task, cover_letter.json → write_cover_letter_task
+    
+    Write pipeline_status.json with EXACT schema:
+    {
+      "ok": true/false,
+      "status": "ready" | "blocked" | "degraded",
+      "ready_for_latex": true/false,
+      "message": "...",
+      "blocking_errors": [],
+      "warnings": [],
+      "phase_status": {
+        "preflight_task": "success" | "error" | "warning" | "skipped",
+        "profile_validation_task": "success" | "error" | "skipped",
+        "collect_file_info_task": "success" | "error" | "warning" | "skipped",
+        "template_validation_task": "success" | "warning" | "skipped",
+        "parse_job_description_task": "success" | "error" | "skipped",
+        "select_experiences_task": "success" | "error" | "skipped",
+        "select_projects_task": "success" | "error" | "skipped",
+        "select_skills_task": "success" | "error" | "skipped",
+        "write_summary_task": "success" | "error" | "skipped",
+        "write_education_section_task": "success" | "error" | "skipped",
+        "ats_check_task": "success" | "error" | "degraded" | "skipped",
+        "privacy_validation_task": "success" | "error" | "skipped",
+        "write_cover_letter_task": "success" | "error" | "degraded" | "skipped"
+      },
+      "what_was_skipped_and_why": [{"phase": "...", "reason": "..."}],
+      "mode": "standard" | "custom_template" | "with_reference" | "custom_with_reference",
+      "self_test": "passed" | "failed"
+    }
+    
+    ⚠️ CRITICAL: phase_status MUST be an object (dict), NOT a string. self_test MUST be "passed" or "failed" (string), NOT an object.
+    
+    Write tailor_plan.json: human-readable summary
+    
+    ⚠️ Use "output/" prefix. ⚠️ MUST write both JSON files.
+  expected_output: >
+    Three JSON files: pipeline_status.json (machine-readable), tailor_plan.json (human-readable), 
+    and optionally pipeline_status_debug.json (if debug=true)
+  agent: pipeline_orchestrator
+  context:
+    - profile_validation_task
+    - collect_file_info_task
+    - parse_job_description_task
+    - select_experiences_task
+    - select_projects_task
+    - select_skills_task
+    - write_header_task
+    - write_summary_task
+    - write_education_section_task
+    - ats_check_task
+    - privacy_validation_task
+    - template_validation_task
+  # REPLACED BY: deterministic_pipeline.compute_pipeline_status()
+  # NOTE: pipeline_orchestrator agent still used in main.py for LaTeX adjustments
+
+# ============================================
+# NOT CURRENTLY WIRED INTO PIPELINE
+# ============================================
+
+latex_repair_task:
+  description: >
+    Use progress_reporter: 0.85="Repairing LaTeX..."
+    
+    Repair a broken LaTeX resume file by intelligently analyzing and fixing issues. This task should be
+    used when a LaTeX file has compilation errors related to:
+    - Font expansion errors (moderncv/microtype conflicts)
+    - Missing FontAwesome icons
+    - Package conflicts
+    - Document class issues
+    - Width macro issues (\maincolumnwidth undefined)
+    - Custom command definition problems
+    - Header rendering failures
+    
+    CRITICAL WORKFLOW FOR RESUMECV/MODERNCV:
+    When using resumecv (moderncv-derived), automatically:
+    1. Disable microtype expansion
+    2. Initialize \maincolumnwidth to \textwidth
+    3. Replace FontAwesome macros with Unicode equivalents
+    4. If header rendering still fails, fall back to article class
+    
+    WORKFLOW:
+    1. Read the LaTeX file using read_latex_file (typically output/generated/rendered_resume.tex)
+    2. Check if it's a resumecv/moderncv document
+    3. If resumecv/moderncv:
+       a. Apply fix_resumecv_compatibility FIRST (tries to keep resumecv working)
+       b. ALWAYS run fix_latex_widths next (replace \maincolumnwidth → \textwidth if used by template)
+       c. ALWAYS run fix_latex_links next (force short labels, hyphenable URLs)
+       d. Then use detect_header_rendering_issue to check if header will render correctly
+       e. If header issues detected, fall back to article using fix_latex_document_class
+       f. Continue with other fixes as needed
+    4. If not resumecv/moderncv (or after fallback):
+       a. Apply fixes in logical order:
+          - fix_latex_document_class (if needed)
+          - fix_latex_widths - Replace \maincolumnwidth with \textwidth
+          - fix_latex_links - Ensure consistent link formatting (short labels, hyphenable URLs)
+          - fix_latex_packages - Add required packages, remove problematic ones
+          - fix_latex_icons - Replace FontAwesome with Unicode
+          - fix_latex_commands - Remove problematic command definitions
+    5. Write the repaired content using write_latex_file
+    6. Report what issues were found and fixed
+    
+    IMPORTANT: For resumecv/moderncv, try compatibility fixes FIRST, then widths → links → header detection → fallback.
+    Apply fixes in order, using the output of each fix as input to the next.
+    The repaired file should compile cleanly with xelatex (preferred) or pdflatex (fallback) without errors.
+  agent: latex_resume_cleaner
+  expected_output: >
+    A repaired LaTeX file that compiles cleanly. Report should include:
+    - What document class was detected (resumecv/moderncv/article)
+    - What compatibility fixes were applied (if resumecv/moderncv)
+    - Whether header rendering issues were detected
+    - Whether fallback to article was needed
+    - What other fixes were applied (in order)
+    - Confirmation that the file was written successfully
+  output_file: output/generated/rendered_resume.tex
+  # NOTE: Not currently invoked in main pipeline. Reserved for future LaTeX repair pipeline.
+
+latex_final_edit_task:
+  description: >
+    Use progress_reporter: 0.90="Finalizing LaTeX..."
+    
+    Perform intelligent final edits and touchups to the LaTeX resume file. This task focuses on:
+    - Formatting consistency and polish
+    - Typography and spacing improvements
+    - Section organization and readability
+    - Overall professional presentation
+    - Maintaining template style and structure
+    
+    WORKFLOW:
+    1. Read the current LaTeX file using read_latex_file (typically output/generated/rendered_resume.tex)
+    2. If a template file is available (check for custom_template_path or default template):
+       a. Use analyze_template_style to understand the template's style patterns
+       b. Note the document class, packages, formatting conventions, and structure
+    3. Apply intelligent improvements directly to the LaTeX content while maintaining template consistency:
+       - Ensure all sections follow consistent formatting
+       - Improve spacing and typography for better readability
+       - Refine section organization and structure
+       - Polish content presentation and clarity
+       - Fix any minor formatting inconsistencies
+    4. Write the polished content using write_latex_file
+    5. Report what improvements were made
+    
+    IMPORTANT: 
+    - Maintain the template's style and structure throughout
+    - Focus on polish and refinement, not major structural changes
+    - Preserve all content while improving presentation
+    - Ensure the final file compiles cleanly
+  agent: latex_final_editor
+  expected_output: >
+    A polished LaTeX file with improved formatting, typography, and presentation. Report should include:
+    - What template style was analyzed (if template was provided)
+    - What formatting improvements were made
+    - What typography and spacing adjustments were applied
+    - What organizational improvements were made
+    - Confirmation that template style was maintained
+    - Confirmation that the file was written successfully
+  output_file: output/generated/rendered_resume.tex
+  # NOTE: Not currently invoked in main pipeline. Reserved for future LaTeX polish pipeline.
+
+ats_rules_audit_task:
+  description: >
+    Run deterministic ATS (Applicant Tracking System) rules check on the compiled LaTeX file.
+    This is a fast, rule-based check that complements LLM-based ATS analysis.
+    
+    Steps:
+    1. Use ats_rules_audit tool with tex_path="output/generated/rendered_resume.tex", max_links=12
+    2. The tool will check for:
+       - Email address presence
+       - Phone number presence
+       - No embedded images
+       - No wide tables (narrow tabular with two columns OK)
+       - Limited hyperlinks (≤12 links cap, configurable via max_links parameter)
+       - Standard sections (Summary, Experience, Education)
+       - Unicode-safe content (basic typography • – — allowed, problematic Unicode flagged)
+       - Reasonable length (200-5000 words)
+    3. Output JSON with score (0-1) and findings
+    
+  expected_output: >
+    JSON with score (float), findings (array), and summary (string)
+  agent: ats_auditor
+  output_file: output/ats_rules_report.json
+  # NOTE: Not currently invoked in main pipeline. Can be used via deterministic_pipeline.run_ats_rules_audit()
+

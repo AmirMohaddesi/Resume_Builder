@@ -1,14 +1,10 @@
-\documentclass[11pt,a4paper,sans]{moderncv}
-\moderncvstyle{banking}
-\moderncvcolor{black}
-\nopagenumbers{}
-\usepackage[utf8]{inputenc}
-\usepackage[scale=0.915]{geometry}
-\usepackage{ragged2e}
-\usepackage{multicol}
-\usepackage{enumitem}
-\usepackage{xcolor}
-\usepackage{hyperref}
+\nofiles  % prevents aux/toc/lot etc.; faster, fewer reruns
+\documentclass[11pt,a4paper]{resumecv}
+% Note: \moderncvstyle and \moderncvcolor are NOT compatible with resumecv class
+% They are removed automatically by the builder if present
+\nopagenumbers
+% Note: geometry, hyperref, xcolor, inputenc, enumitem, multicol, ragged2e are already loaded by resumecv.cls
+% Only add packages that are NOT already loaded by the class
 \usepackage{fontawesome5}
 \usepackage{amssymb}  % For \mathbb support as fallback
 
@@ -28,19 +24,22 @@
 % Identity section (name, contact info, social links)
 % === AUTO:IDENTITY ===
 
-\section{Summary}
+% Tailored header with keywords and contact info
+% === AUTO:HEADER ===
+
+\section*{Summary}
 % === AUTO:SUMMARY ===
 
-\section{Experience}
+\section*{Experience}
 % === AUTO:EXPERIENCE ===
 
-\section{Education}
+\section*{Education}
 % === AUTO:EDUCATION ===
 
-\section{Skills}
+\section*{Skills}
 % === AUTO:SKILLS ===
 
-\section{Achievements}
+\section*{Achievements}
 % === AUTO:ACHIEVEMENTS ===
 
 \section*{Additional Info}

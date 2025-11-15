@@ -1,0 +1,197 @@
+\documentclass[11pt,a4paper]{resumecv}
+\nopagenumbers
+\usepackage{amssymb}
+
+% If you really want the icons (\faMobile etc.), uncomment:
+\usepackage{fontawesome5}
+% --- Widen layout & fix ModernCV/resumecv mix ---
+% Widen page margins (resumecv already loads geometry; override after class)
+\geometry{margin=0.75in}
+
+% Gentler lists and fewer breaks to pull content up
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=*, labelsep=0.5em, topsep=.15em, itemsep=.15em, parsep=0em}
+
+% Ease line-breaking so LaTeX hyphenates less aggressively without overfull boxes
+\sloppy
+\emergencystretch=3em
+
+\name{\textcolor{black}{Amirhosein}}{\textcolor{black}{Mohaddesi}}
+
+% -------------------- custom helpers (unchanged) --------------------
+\newcommand*{\customcventry}[7][.08em]{%
+\begin{tabular}{@{}l}
+{\bfseries #4}\\
+{\itshape #3}
+\end{tabular}
+\hfill
+\begin{tabular}{l@{}}
+{\bfseries #5}\\
+{\itshape #2}
+\end{tabular}
+\ifx&#7&%
+\else\\[.15em]%
+{\small #7}%  % no minipage: allows page breaks%
+\fi
+\par\addvspace{#1}}
+
+\newcommand*{\awardentry}[3]{%
+\begin{tabular}{@{}l}
+#1
+\end{tabular}
+\hfill
+\begin{tabular}{l@{}}
+{\bfseries #2}\\
+{\itshape #3}
+\end{tabular}}
+
+\begin{document}
+\makecvtitle
+
+
+
+
+\begin{center} \textbf{Automated testing \textbar{} Testing pipelines and frameworks \textbar{} Infrastructure \textbar{} Mentoring \textbar{} Technical decision-making} \end{center}
+\begin{center}\begin{tabular}{ c c c c }
+\enspace\faMobile\enspace (949) 426-8113 & \multicolumn{2}{c} {$\mathbb{E}$}\enspace {amir.mohaddesi@gmail.com} & \enspace\faHome\enspace Cupertino, California, United States &  \\
+\hline
+\color{blue} {$\mathbb{W}$} \href{https://amirmohaddesi.github.io/}{Personal Website} & \enspace\faLinkedin\enspace \color{blue} \href{https://www.linkedin.com/in/amohaddesi}{amohaddesi} & \enspace\faGithub\enspace \color{blue} \href{https://github.com/AmirMohaddesi}{AmirMohaddesi} & {$\mathbb{G}$}\enspace \color{blue} \href{https://scholar.google.com/citations?user=goi591YAAAAJ&hl=en}{Google Scholar} \\
+\end{{tabular}}\end{{center}}
+
+\section{Summary}
+AI/Robotics Engineer with a Ph.D. in Information \& Computer Science (Robotics focus) and 5–6 years of experience in ML, multi-agent systems, and simulation. Currently specializing in Agentic AI, integrating Large Language Models (LLMs) with ROS2 to enable autonomous, language-driven decision-making in robotics. Proficient in PyTorch, Hugging Face, and LangChain, with a strong track record in reinforcement learning, transformer models, and emerging agentic AI applications.
+
+\section{Research Experience}
+
+\pagebreak[2]
+\customcventry
+{Sep 2021 -- Jun 2025}
+{\href{https://sites.socsci.uci.edu/~jkrichma/CARL/}{CARL Lab}, University of California, Irvine}
+{Graduate Researcher}
+{CA, USA}
+{}
+{%
+\begin{itemize}[leftmargin=0.6cm, label={}]
+  \item \textbf{Platform to train and study navigation agents in ROS2 environment, \textcolor{blue}{\href{https://github.com/AmirMohaddesi/Human-driven-navigation-strategies-in-a-ROS2-environment}{GitHub}}}
+  \begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+    \item Built a \textbf{multi-robot simulation platform in ROS2} to study human-inspired navigation strategies (\textit{Route, Survey, Mixed}) for team-based exploration and coordination.
+    \item \textbf{Scaled the system from Webots to ROS2}, enabling larger swarm sizes, realistic sensor simulation, and integration with SLAM Toolbox, Nav2, and map\_merge.
+    \item Conducted \textbf{simulation-based experiments} measuring task efficiency, coverage, and cooperation among robot teams with varying navigation strategies.
+    \item Designed a \textbf{communication-aware coordination framework} allowing robots to share exploration goals and avoid redundant paths.
+    \item Integrated \textbf{C++ and Python nodes} for navigation, mapping, and data logging; visualized multi-robot states in RViz for live analysis.
+    \item Planned extension toward \textbf{imitation learning from human trajectory data} and future integration with \textbf{LLM-based reasoning} for agent communication and planning.
+  \end{itemize}
+  \item \textbf{Benefits of Varying Navigation Strategies in Robot Teams, \textcolor{blue}{\href{https://github.com/AmirMohaddesi/Benefits-of-Varying-Navigation-Strategies-in-Robots}{GitHub}}}
+  \begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+    \item Investigated the benefits of varying human-inspired navigation strategies (Route, Survey, Mixed) in robot teams through simulation-based experimentation.
+    \item Developed a multi-agent setup in \textbf{Webots} using \textbf{Clearpath PR2} robots to evaluate task performance and strategy efficiency.
+    \item Implemented obstacle avoidance and conflict resolution algorithms using a \textbf{C++} controller.
+    \item Analyzed the impact of navigation strategy on task completion time, environment coverage, and coordination effectiveness.
+    \item Demonstrated that mixed strategies yield a robust balance between exploration and efficiency in team-based navigation tasks.
+    \item Contributed insights applicable to real-world exploration, search, and rescue missions involving autonomous robot teams.
+  \end{itemize}
+  \vspace{.25em}
+  Mohaddesi, S.A.; Hegarty, M.; Chrastil, E.R.; Krichmar, J.L. \textit{“Benefit of Varying Navigation Strategies in Robot Teams.”} \textcolor{blue}{\href{https://link.springer.com/chapter/10.1007/978-3-031-71533-4_5}{Proceedings of SAB 2024}} (17th International Conference on Simulation of Adaptive Behavior), \textit{Lecture Notes in Computer Science}, Vol.~14993, pp.~63--77, Springer, 2024. DOI: \texttt{10.1007/978-3-031-71533-4\_5}. A related study was also published in \textcolor{blue}{\href{https://ieeexplore.ieee.org/abstract/document/10644592}{IEEE ICDL 2024}}.
+  \item \textbf{Navigation and Cognitive Load in Telepresence Robots}
+  \begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+    \item Led a study evaluating cognitive load in manual vs.\ autonomous navigation using telepresence robots in a scavenger-hunt task.
+    \item Developed autonomous navigation features, including real-time SLAM mapping in ROS and a custom GUI using PyQt.
+    \item Designed experimental metrics for cognitive load, spatial awareness, user presence, and task efficiency.
+    \item Conducted user studies to evaluate performance across autonomous and manual navigation modes.
+    \item Concluded that autonomy reduced cognitive burden and improved movement efficiency, memory retention, and usability.
+  \end{itemize}
+  Pan, G.; Weiss, T.; Mohaddesi, S.A.; Szura, J.W.; Krichmar, J.L. \textit{“Navigation and Cognitive Load in Telepresence Robots.”} \textcolor{blue}{\href{https://ieeexplore.ieee.org/abstract/document/10644592}{IEEE ICDL 2024}}, pp.~1--6, DOI: \texttt{10.1109/ICDL61372.2024.10644592}.
+\end{itemize}
+}
+
+\customcventry
+{Jul 2020 -- Jul 2021}
+{\href{https://nmi-lab.org}{NMI Lab}, University of California, Irvine}
+{Assistant}
+{CA, USA}
+{}
+{%
+\begin{itemize}[leftmargin=0.6cm, label={}]
+  \item \textbf{8-bit quantization technique for spiking neural networks}
+  \begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+    \item Developed an 8-bit quantized spiking neural network (SNN) using \textbf{PyTorch} for power-efficient embedded deployment.
+    \item Introduced a custom quantization technique that reduced energy consumption by \textbf{12\%--18\%}.
+    \item Maintained model accuracy within a \textbf{3\%--7\%} margin, validating efficiency/performance trade-offs.
+  \end{itemize}
+\end{itemize}
+}
+
+\section{Selected Projects}
+\customcventry
+{2025}{}{\textbf{Alter Ego: Personalized Conversational AI}, \textcolor{blue}{\href{https://huggingface.co/spaces/AMIXXM/Career_Conversation}{Hugging Face Demo}}}{}{}{% 
+\begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+  \item Designed and deployed a conversational AI agent that represents my professional background and research expertise.
+  \item Built using \textbf{Python, Gradio, and the OpenAI API} with local persona embeddings for adaptive, context-aware conversations.
+  \item Deployed on \textbf{Hugging Face Spaces} for public access and website integration.
+\end{itemize}
+}
+
+\customcventry
+{2024}{}{\textbf{Multi-Robot Coordination and Distributed Control System}, UC Irvine -- CARL Lab \textcolor{blue}{\href{https://github.com/AmirMohaddesi/Human-driven-navigation-strategies-in-a-ROS2-environment}{GitHub}}}{}{}{% 
+\begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+  \item Built a \textbf{ROS2 Humble-based simulation platform} for multi-robot coordination in disaster-response environments.
+  \item Integrated \textbf{SLAM Toolbox, Nav2, map\_merge, and frontier exploration} for collaborative navigation and mapping.
+\end{itemize}
+}
+
+\customcventry
+{2022}{}{\textbf{Benefits of Varying Navigation Strategies in Teams of Robots}, UC Irvine -- CARL Lab \textcolor{blue}{\href{https://github.com/AmirMohaddesi/Benefits-of-Varying-Navigation-Strategies-in-Robots}{GitHub}}}{}{}{% 
+\begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+  \item Investigated how \textbf{Route, Survey, and Mixed} strategies affect multi-robot team efficiency in \textbf{ROS2 and Webots} with Clearpath PR2 robots.
+\end{itemize}
+}
+
+\customcventry
+{2021}{}{\textbf{Lunar Lander Trajectory Prediction (LLTP)}, UC Irvine -- PSYCH 239 \textcolor{blue}{\href{https://github.com/AmirMohaddesi/LLTP/tree/master}{GitHub}}}{}{}{% 
+\begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+  \item Built trajectory predictors with \textbf{RNNs} and \textbf{Convolutional Autoencoders} in \textbf{OpenAI Gym}; showed simple RNNs can learn Newtonian motion patterns.
+\end{itemize}
+}
+
+\section{Skills}
+\begin{itemize}[label=\textbullet]
+\item \textbf{LLMs \& Agentic AI}: OpenAI API, LangChain, RAG, Prompt Engineering, LoRA/PEFT
+\item \textbf{Machine Learning}: CNN, RNN, Autoencoders, Transformers, RL (DQN, PPO), VAE, SNNs, Quantization
+\item \textbf{Programming}: Python, C++, Bash \ \ \textbf{Frameworks}: PyTorch, TensorFlow, OpenCV, HF Transformers, scikit-learn, Keras
+\item \textbf{Data/Viz}: NumPy, Pandas, Matplotlib, Seaborn, SQL, Jupyter \ \ \textbf{Sim}: ROS2, Gazebo, Webots, OpenAI Gym
+\item \textbf{OS/Tools}: Linux (Ubuntu), Windows, Git, Docker, Conda
+\end{itemize}
+
+\section{Education}
+\customcventry
+{Sep 2019 -- Jun 2025}
+{\href{https://uci.edu/}{University of California, Irvine} \ \ Ph.D. in Information and Computer Science (ICS)}
+{Irvine, CA}{}{}{%
+\begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+\item Cumulative GPA: 3.93
+\item Relevant Courses: Embedded Ubiquitous Systems, Machine Learning, Neural Networks, Computational Neuroscience, Cognitive Robotics
+\item Awards: Dean's Award, Donald Bren School of ICS
+\end{itemize}
+}
+
+\customcventry
+{Sep 2015 -- Jun 2019}
+{\href{https://sharif.edu/}{Sharif University of Technology} \ \ B.S. in Computer Engineering}
+{Tehran, Iran}{}{}{%
+\begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+\item Cumulative GPA: 3.95
+\item Relevant Courses: Computer Architecture, Embedded Systems, Electrical Circuits, VLSI, Real-Time Processing
+\end{itemize}
+}
+
+\section{Achievements}
+\begin{itemize}[leftmargin=0.6cm, label={\textbullet}]
+\item \awardentry{\textbf{Direct PhD fellowship} \ -- Donald Bren School of Information and Computer Science}{UCI, Irvine, CA}{2019}
+\item \awardentry{\textbf{Dean's Award} \ -- Donald Bren School of Information and Computer Science}{UCI, Irvine, CA}{2019}
+\item \awardentry{\textbf{Silver Medal} \ -- Iran's National Physics Olympiad, NODET}{Tehran, Iran}{2013}
+\end{itemize}
+
+\section*{Additional Info}
+Authorized to work in the U.S. under F-1 OPT (valid through June 2026); Extendable by another two years under OPT-STEM. No immediate sponsorship required.
+
+\end{document}

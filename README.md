@@ -59,10 +59,23 @@ See [Installation Guide](docs/INSTALLATION.md) for detailed setup.
 Create a `.env` file in the project root:
 
 ```bash
+# 1. REQUIRED: OpenAI API Key
 OPENAI_API_KEY=your-api-key-here
+
+# 2. OPTIONAL: LLM Model (Cost Control)
+# Set this to control which model ALL agents use
+# Default: gpt-4o-mini (cheapest, ~$0.15 per 1M tokens)
+# Options: gpt-4o-mini, gpt-4o, gpt-3.5-turbo, ollama/llama3.2
+LLM_MODEL=gpt-4o-mini
+
+# 3. OPTIONAL: Logging & Server
+LOG_LEVEL=INFO
+GRADIO_SERVER_PORT=7860
 ```
 
-For local/private models (Llama, Ollama), see [Configuration Guide](docs/CONFIGURATION.md).
+**💡 Cost Savings Tip**: Set `LLM_MODEL=gpt-4o-mini` to reduce costs by ~94% compared to using `gpt-4o`!
+
+For local/private models (Llama, Ollama) and advanced configuration, see [Configuration Guide](docs/CONFIGURATION.md).
 
 ## 📁 Output Files
 

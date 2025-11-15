@@ -1,0 +1,22 @@
+{
+  "status": "success",
+  "message": "Job description parsed successfully",
+  "title": "Software Developer",
+  "company": "Apple",
+  "location": "Cupertino, California",
+  "skills": [
+    "Java",
+    "Python",
+    "JavaScript",
+    "Swift",
+    "SQL"
+  ],
+  "keywords": [
+    "Software Development",
+    "Agile",
+    "Team Collaboration",
+    "Problem Solving",
+    "Debugging"
+  ],
+  "cleaned_text": "We are looking for a Software Developer to join our team at Apple. In this role, you will be responsible for designing and implementing software solutions. You should have a strong proficiency in programming languages such as Java, Python, or Swift. Familiarity with Agile methodologies and a passion for technology is essential. We value diversity and inclusion and are committed to creating a positive workplace culture."
+}

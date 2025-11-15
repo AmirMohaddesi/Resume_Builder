@@ -26,6 +26,19 @@ output/logs/resume_builder_*.log
 !output/.gitkeep
 !output/logs/latest.log
 
+# Personal data files (user-specific, should not be committed)
+src/resume_builder/data/profile.json
+
+# LaTeX build artifacts
+output/build/
+output/generated/*.aux
+output/generated/*.log
+output/generated/*.out
+output/generated/*.toc
+output/generated/*.fdb_latexmk
+output/generated/*.fls
+output/generated/*.synctex.gz
+
 # Temporary files
 *.tmp
 *.bak
