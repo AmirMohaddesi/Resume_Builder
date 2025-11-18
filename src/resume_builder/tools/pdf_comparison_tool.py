@@ -42,24 +42,61 @@ class PdfComparisonTool(BaseTool):
     args_schema: Type[BaseModel] = PdfComparisonInput
     
     def _run(self, reference_pdf: str, generated_pdf: str) -> str:
-        """Compare two PDFs and return structured diff as JSON string."""
+        """Compare two PDFs and return structured diff as JSON string.
+        
+        Standard paths:
+        - Generated PDF: output/generated/final_resume.pdf
+        - Reference PDFs: typically in examples/ or user-provided
+        """
         try:
             import fitz  # PyMuPDF
             
             # Resolve paths
-            ref_path = resolve_under_root(reference_pdf)
-            gen_path = resolve_under_root(generated_pdf)
+            try:
+                ref_path = resolve_under_root(reference_pdf)
+            except ValueError as e:
+                return json.dumps({
+                    "error": f"Invalid reference PDF path: {str(e)}",
+                    "status": "error",
+                    "hint": "Standard path: output/generated/final_resume.pdf"
+                }, indent=2)
+            
+            try:
+                gen_path = resolve_under_root(generated_pdf)
+            except ValueError as e:
+                return json.dumps({
+                    "error": f"Invalid generated PDF path: {str(e)}",
+                    "status": "error",
+                    "hint": "Standard path: output/generated/final_resume.pdf"
+                }, indent=2)
             
             if not ref_path.exists():
                 return json.dumps({
                     "error": f"Reference PDF not found: {reference_pdf}",
-                    "status": "error"
+                    "status": "error",
+                    "hint": "Standard path: output/generated/final_resume.pdf"
                 }, indent=2)
             
             if not gen_path.exists():
                 return json.dumps({
                     "error": f"Generated PDF not found: {generated_pdf}",
-                    "status": "error"
+                    "status": "error",
+                    "hint": "Standard path: output/generated/final_resume.pdf"
+                }, indent=2)
+            
+            # Validate they're files, not directories
+            if ref_path.is_dir():
+                return json.dumps({
+                    "error": f"Reference PDF path is a directory: {reference_pdf}",
+                    "status": "error",
+                    "hint": "Use a file path. Standard: output/generated/final_resume.pdf"
+                }, indent=2)
+            
+            if gen_path.is_dir():
+                return json.dumps({
+                    "error": f"Generated PDF path is a directory: {generated_pdf}",
+                    "status": "error",
+                    "hint": "Use a file path. Standard: output/generated/final_resume.pdf"
                 }, indent=2)
             
             # Open PDFs

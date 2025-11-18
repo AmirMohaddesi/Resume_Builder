@@ -73,10 +73,14 @@ class LatexCompileTool(BaseTool):
             (r'Error: (.*)', 'Error'),
             (r'Fatal error: (.*)', 'Fatal Error'),
             (r'Undefined control sequence', 'Undefined control sequence'),
+            (r'Undefined command', 'Undefined command'),
+            (r'LaTeX Error.*undefined', 'Undefined command'),
+            (r'command.*undefined', 'Undefined command'),
             (r'Missing .* inserted', 'Missing character'),
             (r'Overfull .*', 'Overfull hbox'),
             (r'Underfull .*', 'Underfull hbox'),
             (r'Package .* Error', 'Package Error'),
+            (r'Warning.*undefined', 'Undefined command warning'),
         ]
         
         for i, line in enumerate(lines):
@@ -97,11 +101,44 @@ class LatexCompileTool(BaseTool):
         tex = Path(tex_path).resolve()
         logger.debug(f"Resolved LaTeX path: {tex}")
         
+        # Load LaTeX error memory system
+        known_error_summary = None
+        latex_fingerprint = None
+        tex_content_for_fingerprint = None
+        try:
+            from resume_builder.latex_error_memory import (
+                compute_latex_fingerprint,
+                lookup_errors,
+                summarize_errors_for_ui,
+                record_error
+            )
+            
+            # Read LaTeX content for fingerprinting
+            tex_content_for_fingerprint = tex.read_text(encoding="utf-8")
+            latex_fingerprint = compute_latex_fingerprint(tex_content_for_fingerprint)
+            
+            # Check for known errors
+            known_errors = lookup_errors(latex_fingerprint)
+            if known_errors:
+                known_error_summary = summarize_errors_for_ui(latex_fingerprint)
+                logger.info(f"Found {len(known_errors)} known error(s) for this LaTeX document")
+                if known_error_summary:
+                    logger.info(f"Known error summary: {known_error_summary[:200]}...")
+        except Exception as e:
+            logger.debug(f"Error memory system unavailable: {e}")
+            # Continue without error memory - don't break compilation
+        
         # Strip "output/" prefix from out_name to prevent nested output/ directories
+        # Also strip "generated/" if present to prevent double generated/generated paths
+        original_out_name = out_name
         out_name_clean = out_name.replace("\\", "/")
         if out_name_clean.startswith("output/"):
-            out_name = out_name_clean[7:]  # Remove "output/" prefix
-            logger.debug(f"Stripped 'output/' prefix from out_name: {out_name}")
+            out_name_clean = out_name_clean[7:]  # Remove "output/" prefix
+        if out_name_clean.startswith("generated/"):
+            out_name_clean = out_name_clean[10:]  # Remove "generated/" prefix
+        out_name = out_name_clean
+        if out_name != original_out_name:
+            logger.debug(f"Cleaned out_name: '{original_out_name}' -> '{out_name}'")
         
         # Find project root reliably
         # Strategy: Look for common project markers (pyproject.toml, src/, output/)
@@ -156,7 +193,11 @@ class LatexCompileTool(BaseTool):
         logger.debug(f"Output directory: {output_dir}, Log path: {compile_log_path}")
         
         # Read LaTeX content early to check for Unicode (needed for engine selection)
-        tex_content = tex.read_text(encoding="utf-8")
+        # Reuse content from fingerprinting if available
+        if tex_content_for_fingerprint is not None:
+            tex_content = tex_content_for_fingerprint
+        else:
+            tex_content = tex.read_text(encoding="utf-8")
         
         # Determine which engine to use
         engine_param = engine if engine is not None else kwargs.get('engine', 'auto')
@@ -323,14 +364,22 @@ class LatexCompileTool(BaseTool):
                 # Extract errors from log - filter out None values and empty strings
                 compilation_log = [log for log in compilation_log if log is not None and isinstance(log, str)]
                 full_log = "\n\n".join(compilation_log) if compilation_log else "No compilation output captured."
+                
+                # Truncate log for inclusion in results (keep last 2000 chars)
+                LOG_TRUNCATE_SIZE = 2000
+                if len(full_log) > LOG_TRUNCATE_SIZE:
+                    full_log_truncated = "..." + full_log[-LOG_TRUNCATE_SIZE:]
+                else:
+                    full_log_truncated = full_log
+                
                 extracted_errors = self._extract_latex_errors(full_log)
                 if extracted_errors:
-                    logger.warning("LaTeX compilation errors detected:")
-                    logger.warning(extracted_errors)
+                    logger.warning("LaTeX compilation errors detected")
+                    logger.debug(f"Errors: {extracted_errors[:500]}...")  # Truncate for logging
                 else:
                     logger.info("No LaTeX errors detected in compilation log")
                 
-                # Persist log after runs
+                # Persist full log to file (not truncated)
                 try:
                     compile_log_path.write_text(full_log, encoding="utf-8")
                     logger.debug(f"Compilation log saved to: {compile_log_path}")
@@ -361,12 +410,33 @@ class LatexCompileTool(BaseTool):
                 # Return error log for debugging
                 error_log = "\n".join(compilation_log)
                 extracted_errors = self._extract_latex_errors(error_log)
+                
+                # Record error in memory system
+                if latex_fingerprint:
+                    try:
+                        from resume_builder.latex_error_memory import record_error, classify_error_type
+                        error_info = {
+                            "log_text": error_log,
+                            "error_message": extracted_errors or "PDF not generated",
+                            "error_type": classify_error_type(extracted_errors or error_log),
+                        }
+                        record_error(latex_fingerprint, error_info, tex_content_for_fingerprint)
+                    except Exception as e:
+                        logger.debug(f"Failed to record error in memory: {e}")
+                
                 # Don't create a corrupted PDF file - remove it if it exists
                 final_path = output_dir / out_name
                 if final_path.exists():
                     final_path.unlink()  # Delete corrupted PDF
                     logger.debug(f"Removed existing PDF: {final_path}")
-                error_msg = f"PDF not generated. {engine_name} compilation failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log[-1000:] if error_log else f'No compilation log available. Is {engine_name} installed?'}\n\nTIP: Copy the LaTeX content from output/generated/rendered_resume.tex to Overleaf to see detailed errors."
+                # Truncate error log for message (keep last 1000 chars)
+                error_log_preview = error_log[-1000:] if error_log and len(error_log) > 1000 else (error_log or f'No compilation log available. Is {engine_name} installed?')
+                error_msg = f"PDF not generated. {engine_name} compilation failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log_preview}\n\nTIP: Copy the LaTeX content from output/generated/rendered_resume.tex to Overleaf to see detailed errors."
+                
+                # Add known error summary if available
+                if known_error_summary:
+                    error_msg = f"{known_error_summary}\n\n--- Current Error ---\n\n{error_msg}"
+                
                 try:
                     compile_log_path.write_text(f"{extracted_errors}\n\n--- FULL LOG ---\n\n{error_log}", encoding="utf-8")
                 except Exception:
@@ -376,15 +446,55 @@ class LatexCompileTool(BaseTool):
             pdf_size = pdf_file.stat().st_size
             logger.info(f"PDF generated successfully: {pdf_size:,} bytes")
             
+            # Check for errors in compilation log even if PDF was generated
+            # LaTeX can generate PDFs with errors (warnings), and we should record those
+            error_log = "\n".join(compilation_log)
+            extracted_errors = self._extract_latex_errors(error_log)
+            
+            # Record errors in memory system even if PDF was generated
+            # This captures warnings and errors that don't prevent PDF generation
+            if extracted_errors and latex_fingerprint:
+                try:
+                    from resume_builder.latex_error_memory import record_error, classify_error_type
+                    error_info = {
+                        "log_text": error_log,
+                        "error_message": extracted_errors,
+                        "error_type": classify_error_type(extracted_errors),
+                    }
+                    record_error(latex_fingerprint, error_info, tex_content_for_fingerprint)
+                    logger.info(f"Recorded LaTeX error/warning in memory: {error_info['error_type']}")
+                except Exception as e:
+                    logger.debug(f"Failed to record error in memory: {e}")
+            
             # Verify PDF is valid (not empty or corrupted)
             if pdf_size < 1000:  # PDFs should be at least 1KB
                 logger.warning(f"PDF file is suspiciously small: {pdf_size} bytes")
                 error_log = "\n".join(compilation_log)
                 extracted_errors = self._extract_latex_errors(error_log)
+                
+                # Record error in memory system
+                if latex_fingerprint:
+                    try:
+                        from resume_builder.latex_error_memory import record_error, classify_error_type
+                        error_info = {
+                            "log_text": error_log,
+                            "error_message": extracted_errors or "PDF too small (corrupted)",
+                            "error_type": classify_error_type(extracted_errors or error_log),
+                        }
+                        record_error(latex_fingerprint, error_info, tex_content_for_fingerprint)
+                    except Exception as e:
+                        logger.debug(f"Failed to record error in memory: {e}")
+                
                 final_path = output_dir / out_name
                 if final_path.exists():
                     final_path.unlink()  # Delete corrupted PDF
-                error_msg = f"Generated PDF is too small (corrupted). Compilation likely failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log[-1000:] if error_log else 'No compilation log available.'}\n\nTIP: Copy the LaTeX content from output/generated/rendered_resume.tex to Overleaf to see detailed errors."
+                error_log_preview = error_log[-1000:] if error_log and len(error_log) > 1000 else (error_log or 'No compilation log available.')
+                error_msg = f"Generated PDF is too small (corrupted). Compilation likely failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log_preview}\n\nTIP: Copy the LaTeX content from output/generated/rendered_resume.tex to Overleaf to see detailed errors."
+                
+                # Add known error summary if available
+                if known_error_summary:
+                    error_msg = f"{known_error_summary}\n\n--- Current Error ---\n\n{error_msg}"
+                
                 try:
                     compile_log_path.write_text(f"{extracted_errors}\n\n--- FULL LOG ---\n\n{error_log}", encoding="utf-8")
                 except Exception:
@@ -405,7 +515,8 @@ class LatexCompileTool(BaseTool):
             if pdf_size < 1000:
                 error_log = "\n".join(compilation_log)
                 extracted_errors = self._extract_latex_errors(error_log)
-                error_msg = f"PDF file is too small after read ({pdf_size} bytes). Copy may have failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log[-1000:] if error_log else 'No compilation log available.'}"
+                error_log_preview = error_log[-1000:] if error_log and len(error_log) > 1000 else (error_log or 'No compilation log available.')
+                error_msg = f"PDF file is too small after read ({pdf_size} bytes). Copy may have failed.\n\n{extracted_errors}\n\nFull compilation log (last 1000 chars):\n{error_log_preview}"
                 try:
                     compile_log_path.write_text(f"{extracted_errors}\n\n--- FULL LOG ---\n\n{error_log}", encoding="utf-8")
                 except Exception:
@@ -451,4 +562,15 @@ class LatexCompileTool(BaseTool):
             raise RuntimeError(error_msg)
         
         logger.info(f"LaTeX compilation completed successfully: {final_path}")
-        return {"success": True, "pdf_path": str(final_path.resolve()), "log_path": str(compile_log_path.resolve()), "pdf_size": pdf_size}
+        result = {
+            "success": True,
+            "pdf_path": str(final_path.resolve()),
+            "log_path": str(compile_log_path.resolve()),
+            "pdf_size": pdf_size
+        }
+        
+        # Include known error summary in result (even if compilation succeeded, it's useful context)
+        if known_error_summary:
+            result["known_error_summary"] = known_error_summary
+        
+        return result

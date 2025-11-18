@@ -77,7 +77,21 @@ GRADIO_SERVER_PORT=7860
 
 For local/private models (Llama, Ollama) and advanced configuration, see [Configuration Guide](docs/CONFIGURATION.md).
 
-## 📁 Output Files
+## 📁 Project Structure
+
+```
+Resume_Builder/
+├── src/resume_builder/    # Main application code
+├── tests/                 # Test suite
+├── docs/                  # Documentation
+├── examples/              # Example files for reference
+├── scripts/               # Utility scripts
+├── archive/               # Archived files (not used)
+├── output/                # Generated files (gitignored)
+└── README.md              # This file
+```
+
+### Output Files
 
 All generated files are in the `output/` directory:
 

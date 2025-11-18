@@ -46,7 +46,6 @@ class PreflightTool(BaseTool):
             if fallback_path:
                 engine_path = fallback_path
                 engine_type = "pdflatex"
-                warning = "xelatex not found, using pdflatex fallback. Unicode characters may cause issues."
             else:
                 return {
                     "ok": False,

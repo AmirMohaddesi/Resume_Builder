@@ -54,8 +54,12 @@ class LaTeXPackageCheckerTool(BaseTool):
         'koma-script': 'KOMA-Script classes'
     }
 
-    def _extract_packages(self, tex_content: str) -> List[str]:
-        """Extract all packages from \\usepackage commands."""
+    def _extract_packages(self, tex_content: str) -> tuple[List[str], List[str]]:
+        """Extract all packages and document classes from LaTeX content.
+        
+        Returns:
+            Tuple of (packages list, document_classes list)
+        """
         packages = []
         
         # Match \usepackage{package} or \usepackage[options]{package}
@@ -177,34 +181,27 @@ class LaTeXPackageCheckerTool(BaseTool):
         return json.dumps(report, indent=2)
 
     def _generate_recommendation(self, missing_packages: List[Dict], missing_classes: List[str]) -> str:
-        """Generate installation recommendations."""
+        """Generate concise installation recommendations."""
         recommendations = []
         
         if missing_classes:
-            recommendations.append(
-                f"Missing document classes: {', '.join(missing_classes)}. "
-                "These may need to be installed separately."
-            )
+            recommendations.append(f"Install document classes: {', '.join(missing_classes)}")
         
         if missing_packages:
             pkg_names = [p['package'] for p in missing_packages]
             
-            # Check if moderncv is missing (common for resumes)
+            # Common resume packages
             if 'moderncv' in pkg_names:
-                recommendations.append(
-                    "Install moderncv with: tlmgr install moderncv (or via your LaTeX distribution package manager)"
-                )
+                recommendations.append("tlmgr install moderncv")
             
-            # Check if fontawesome is missing
             if any('fontawesome' in p for p in pkg_names):
-                recommendations.append(
-                    "Install Font Awesome with: tlmgr install fontawesome5 (or fontawesome)"
-                )
+                recommendations.append("tlmgr install fontawesome5")
             
+            # General install command for multiple packages
             if len(pkg_names) > 2:
-                recommendations.append(
-                    f"Install all missing packages with: tlmgr install {' '.join(pkg_names)}"
-                )
+                recommendations.append(f"tlmgr install {' '.join(pkg_names)}")
+            elif len(pkg_names) == 1:
+                recommendations.append(f"tlmgr install {pkg_names[0]}")
         
-        return " | ".join(recommendations) if recommendations else "Consider using the default template if issues persist."
+        return " | ".join(recommendations) if recommendations else "Use default template if issues persist."
 

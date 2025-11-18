@@ -1,0 +1,31 @@
+{
+  "profile": {
+    "name": "Amirhosein",
+    "experiences": [
+      {
+        "job_title": "Software Engineer",
+        "company": "Tech Solutions",
+        "location": "Remote",
+        "duration": "2 years",
+        "description": "Developed a comprehensive automated testing framework using Python and CI/CD pipelines, improving deployment efficiency by 30%.",
+        "responsibilities": [
+          "Lead automated testing initiatives for web applications.",
+          "Mentored junior developers on best practices in unit testing and CI/CD integration.",
+          "Collaborated with cross-functional teams to enhance testing strategies."
+        ]
+      },
+      {
+        "job_title": "QA Engineer",
+        "company": "Innovative Tech",
+        "location": "New York",
+        "duration": "1.5 years",
+        "description": "Implemented testing automation tools, resulting in a 40% reduction in manual testing efforts.",
+        "responsibilities": [
+          "Designed and executed automated test cases for API and UI applications.",
+          "Streamlined the QA process using Jenkins for continuous integration.",
+          "Provided training sessions for new team members on automated testing frameworks."
+        ]
+      }
+    ]
+  }
+}

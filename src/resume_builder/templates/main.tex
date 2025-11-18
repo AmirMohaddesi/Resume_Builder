@@ -8,6 +8,18 @@
 \usepackage{fontawesome5}
 \usepackage{amssymb}  % For \mathbb support as fallback
 
+% Compact layout toggle for page budget enforcement
+\newif\ifcompactresume
+\compactresumefalse
+
+\newcommand{\compactresumelayout}{%
+  \compactresumetrue
+  \setlength{\itemsep}{0.2em}
+  \setlength{\parskip}{0.15em}
+  \setlist[itemize]{leftmargin=*, labelsep=0.4em, topsep=0.1em, itemsep=0.1em, parsep=0em}
+  \setlist[enumerate]{leftmargin=*, labelsep=0.4em, topsep=0.1em, itemsep=0.1em, parsep=0em}
+}
+
 % -----------------------------------------------------------------------------
 % This template is a simplified version of the original resume. It defines
 % marker comments where dynamic content will be inserted by the resume

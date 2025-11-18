@@ -1,0 +1,1 @@
+Please ensure you have the correct paths for both the reference PDF and the generated PDF. Typical location to check is: /path/to/reference.pdf.

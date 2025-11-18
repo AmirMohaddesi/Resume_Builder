@@ -39,12 +39,24 @@ class ReadLatexFileTool(BaseTool):
     args_schema: Type[BaseModel] = ReadLatexFileInput
     
     def _run(self, tex_path: str) -> str:
-        """Read and return LaTeX file contents."""
+        """Read and return LaTeX file contents.
+        
+        Standard paths:
+        - Template: src/resume_builder/templates/main.tex
+        - Generated LaTeX: output/generated/rendered_resume.tex
+        """
         try:
-            tex_file = resolve_under_root(tex_path)
+            try:
+                tex_file = resolve_under_root(tex_path)
+            except ValueError as e:
+                return f"[error] {str(e)}. Hint: Use a file path. Standard paths: src/resume_builder/templates/main.tex or output/generated/rendered_resume.tex"
             
             if not tex_file.exists():
-                return f"[error] LaTeX file not found: {tex_path}"
+                return f"[error] LaTeX file not found: {tex_path}. Standard paths: src/resume_builder/templates/main.tex (template) or output/generated/rendered_resume.tex (generated)"
+            
+            # Validate it's a file
+            if tex_file.is_dir():
+                return f"[error] Path is a directory, not a file: {tex_path}. Standard paths: src/resume_builder/templates/main.tex or output/generated/rendered_resume.tex"
             
             content = tex_file.read_text(encoding='utf-8')
             logger.info(f"Read LaTeX file: {tex_file} ({len(content)} characters)")
@@ -105,7 +117,11 @@ class WriteLatexFileTool(BaseTool):
                 cleaned_content = re.sub(r'.\x08', '', cleaned_content)
                 logger.warning("Removed backspace corruption patterns from LaTeX content")
             
-            tex_file = resolve_under_root(tex_path)
+            try:
+                tex_file = resolve_under_root(tex_path)
+            except ValueError as e:
+                return f"[error] {str(e)}. Hint: Use a file path. Standard paths: src/resume_builder/templates/main.tex or output/generated/rendered_resume.tex"
+            
             if not tex_file.parent.exists():
                 tex_file.parent.mkdir(parents=True, exist_ok=True)
             

@@ -120,14 +120,14 @@ def _clean_json_files() -> None:
         "selected_skills.json",
         
         # Content writing files
-        "summary_block.json",
-        "education_block.json",
-        "header_block.json",
+        "summary.json",
+        "education.json",
+        "header.json",
         
         # Quality and analysis files
         "ats_report.json",
         "ats_rules_report.json",
-        "privacy_validation_report.json",
+        "privacy_report.json",
         
         # Template and pipeline files
         "template_validation.json",

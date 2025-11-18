@@ -24,9 +24,18 @@ def resolve_under_root(p: str | Path) -> Path:
         
     Returns:
         Absolute Path object
+        
+    Raises:
+        ValueError: If path resolves to a directory when a file is expected
     """
     p = Path(p)
-    return p if p.is_absolute() else (PROJECT_ROOT / p)
+    resolved = p if p.is_absolute() else (PROJECT_ROOT / p)
+    
+    # Validate that if it exists, it's not a directory (for file operations)
+    if resolved.exists() and resolved.is_dir():
+        raise ValueError(f"Path is a directory, not a file: {resolved}")
+    
+    return resolved
 
 
 def ensure_dirs():

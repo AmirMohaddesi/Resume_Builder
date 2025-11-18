@@ -138,6 +138,75 @@ def extract_phone(text: str) -> Optional[str]:
     return None
 
 
+def extract_location(text: str) -> Optional[str]:
+    """Extract location (city, state) from text, typically found near contact info."""
+    # Common location patterns:
+    # - "City, State" (e.g., "City, State")
+    # - "City, State, Country" (e.g., "City, State, Country")
+    # - "City, ST" (e.g., "City, ST")
+    
+    # First, try to find location near contact info (usually in header area)
+    lines = [line.strip() for line in text.split('\n')[:20] if line.strip()]  # Check first 20 lines
+    
+    # Pattern 1: "City, State" or "City, State, Country"
+    # Match capitalized words followed by comma and state/country
+    pattern1 = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)'
+    
+    # Pattern 2: "City, ST" (two-letter state abbreviation)
+    pattern2 = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\b'
+    
+    # Common US state names (full names)
+    us_states = [
+        'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+        'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+        'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+        'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+        'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+        'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+        'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+        'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+        'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+        'West Virginia', 'Wisconsin', 'Wyoming'
+    ]
+    
+    # Check each line for location patterns
+    for line in lines:
+        # Skip lines that are clearly not locations (emails, phones, URLs)
+        if '@' in line or 'http' in line.lower() or re.search(r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', line):
+            continue
+        
+        # Try pattern 1: "City, State"
+        match1 = re.search(pattern1, line)
+        if match1:
+            city = match1.group(1)
+            state = match1.group(2)
+            # Validate: state should be a known state or reasonable length
+            if state in us_states or len(state) <= 20:
+                # Check if there's a third part (country)
+                remaining = line[match1.end():].strip()
+                if remaining and remaining.startswith(','):
+                    country = remaining[1:].strip()
+                    if len(country) <= 30:  # Reasonable country name length
+                        return f"{city}, {state}, {country}"
+                return f"{city}, {state}"
+        
+        # Try pattern 2: "City, ST" (two-letter state)
+        match2 = re.search(pattern2, line)
+        if match2:
+            city = match2.group(1)
+            state_abbr = match2.group(2)
+            # Common state abbreviations
+            valid_abbrs = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+                          'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+                          'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+                          'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+                          'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY']
+            if state_abbr in valid_abbrs:
+                return f"{city}, {state_abbr}"
+    
+    return None
+
+
 def extract_urls(text: str) -> Dict[str, str]:
     """Extract URLs (LinkedIn, GitHub, website) from text."""
     result = {}
@@ -291,6 +360,7 @@ def parse_resume_to_profile(resume_path: str | Path) -> Dict[str, Any]:
     # Extract contact info from text
     email = extract_email(text)
     phone = extract_phone(text)
+    location = extract_location(text)
     urls = extract_urls(text)
     
     # Merge PDF hyperlinks with text-extracted URLs (PDF hyperlinks take priority)
@@ -346,6 +416,7 @@ def parse_resume_to_profile(resume_path: str | Path) -> Dict[str, Any]:
             "title": title or "",
             "email": email or "",
             "phone": phone or "",
+            "location": location or "",
             "website": urls.get("website", ""),
             "linkedin": urls.get("linkedin", ""),
             "github": urls.get("github", ""),

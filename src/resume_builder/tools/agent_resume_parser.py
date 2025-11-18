@@ -67,6 +67,7 @@ def parse_resume_with_agent(resume_path: str | Path) -> Dict[str, Any]:
                 "title": "job title or professional title",
                 "email": "email address (clean, no phone number fragments)",
                 "phone": "phone number (only actual phone numbers, not years or IDs)",
+                "location": "location (city, state - e.g., 'City, State' or 'City, ST')",
                 "website": "personal website URL if explicitly present in resume, otherwise empty string",
                 "linkedin": "LinkedIn profile URL if explicitly present in resume, otherwise empty string",
                 "github": "GitHub profile URL if explicitly present in resume, otherwise empty string",
@@ -189,7 +190,7 @@ def parse_resume_with_agent(resume_path: str | Path) -> Dict[str, Any]:
     
     # Ensure identity has all required fields
     identity = profile.get("identity", {})
-    for field in ["first", "last", "title", "email", "phone", "website", "linkedin", "github"]:
+    for field in ["first", "last", "title", "email", "phone", "location", "website", "linkedin", "github"]:
         if field not in identity:
             identity[field] = ""
     

@@ -1,8 +1,20 @@
 """
-Centralized JSON loading functions with schema validation.
+Centralized JSON loading functions with runtime consumer safety and backward compatibility.
 
-All JSON files written by agents follow standardized schemas defined in tasks.yaml.
-This module provides helper functions to load and validate these JSON files.
+RESPONSIBILITY: Runtime consumer safety + backward compatibility
+- Load JSON files from disk with error handling
+- Perform light validation (check required fields exist)
+- Apply backward compatibility transforms (e.g., old format → new format)
+- Return safe defaults on errors (never crash the pipeline)
+- Handle missing files gracefully
+
+This module is used by:
+- LaTeX builder (to read JSON for resume generation)
+- Orchestration (to check pipeline status)
+- UI (to display current resume data)
+
+NOT used for:
+- LLM edit output validation (see json_validators.py for that)
 """
 
 from __future__ import annotations
@@ -56,8 +68,8 @@ def load_selected_experiences(file_path: Optional[Path] = None) -> Dict[str, Any
     """
     Load selected_experiences.json with schema validation.
     
-    Schema: {status: "success", message: string, selected_experiences: [{organization: string, 
-             title: string, location?: string, dates: string, description: string}]}
+    Schema: {status: "success", message: string, selected_experiences: [{id, title: string, 
+             company: string, location?: string, dates?: string, priority: number, bullets: [string, ...]}]}
     """
     if file_path is None:
         file_path = OUTPUT_DIR / "selected_experiences.json"
@@ -93,7 +105,7 @@ def load_selected_skills(file_path: Optional[Path] = None) -> Dict[str, Any]:
     """
     Load selected_skills.json with schema validation.
     
-    Schema: {status: "success", message: string, selected_skills: [string, ...]}
+    Schema: {status: "success", message: string, skills: [string, ...], groups?: {name: [skills]}}
     """
     if file_path is None:
         file_path = OUTPUT_DIR / "selected_skills.json"
@@ -109,20 +121,23 @@ def load_selected_skills(file_path: Optional[Path] = None) -> Dict[str, Any]:
             logger.warning(f"selected_skills.json missing 'status' field")
         if "message" not in data:
             logger.warning(f"selected_skills.json missing 'message' field")
-        if "selected_skills" not in data:
-            logger.warning(f"selected_skills.json missing 'selected_skills' field")
-            data["selected_skills"] = []
+        if "skills" not in data:
+            logger.warning(f"selected_skills.json missing 'skills' field")
+            data["skills"] = []
+        # Backward compatibility: if selected_skills exists, use it as skills
+        if "selected_skills" in data and "skills" not in data:
+            data["skills"] = data.pop("selected_skills")
         
         return data
     except FileNotFoundError:
         logger.error(f"selected_skills.json not found: {file_path}")
-        return {"status": "error", "message": "File not found", "selected_skills": []}
+        return {"status": "error", "message": "File not found", "skills": []}
     except json.JSONDecodeError as e:
         logger.error(f"selected_skills.json: Invalid JSON - {e}")
-        return {"status": "error", "message": f"Invalid JSON: {e}", "selected_skills": []}
+        return {"status": "error", "message": f"Invalid JSON: {e}", "skills": []}
     except Exception as e:
         logger.error(f"selected_skills.json: Error reading file - {e}")
-        return {"status": "error", "message": str(e), "selected_skills": []}
+        return {"status": "error", "message": str(e), "skills": []}
 
 
 def load_selected_projects(file_path: Optional[Path] = None) -> Dict[str, Any]:
@@ -130,7 +145,7 @@ def load_selected_projects(file_path: Optional[Path] = None) -> Dict[str, Any]:
     Load selected_projects.json with schema validation.
     
     Schema: {status: "success", message: string, selected_projects: [{name: string, 
-             description: string, url?: string}]}
+             role?: string, priority: number, url?: string, bullets: [string, ...]}]}
     """
     if file_path is None:
         file_path = OUTPUT_DIR / "selected_projects.json"
@@ -164,14 +179,13 @@ def load_selected_projects(file_path: Optional[Path] = None) -> Dict[str, Any]:
 
 def load_header_block(file_path: Optional[Path] = None) -> Dict[str, Any]:
     """
-    Load header_block.json with schema validation.
+    Load header.json with schema validation.
     
-    Schema: {status: "success", message: string, title_line: string, 
-             contact_info: {phone?: string, email?: string, location?: string, 
-             website?: string, linkedin?: string, github?: string, google_scholar?: string}}
+    Schema: {status: "success", message: string, name: string, location?: string, 
+             email: string, phone?: string, links?: [string], target_title: string}
     """
     if file_path is None:
-        file_path = OUTPUT_DIR / "header_block.json"
+        file_path = OUTPUT_DIR / "header.json"
     
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -181,36 +195,63 @@ def load_header_block(file_path: Optional[Path] = None) -> Dict[str, Any]:
         
         # Validate required fields
         if "status" not in data:
-            logger.warning(f"header_block.json missing 'status' field")
+            logger.warning(f"header.json missing 'status' field")
         if "message" not in data:
-            logger.warning(f"header_block.json missing 'message' field")
-        if "title_line" not in data:
-            logger.warning(f"header_block.json missing 'title_line' field")
-            data["title_line"] = ""
-        if "contact_info" not in data:
-            logger.warning(f"header_block.json missing 'contact_info' field")
-            data["contact_info"] = {}
+            logger.warning(f"header.json missing 'message' field")
+        if "name" not in data:
+            logger.warning(f"header.json missing 'name' field")
+            data["name"] = ""
+        if "email" not in data:
+            logger.warning(f"header.json missing 'email' field")
+            data["email"] = ""
+        if "target_title" not in data:
+            logger.warning(f"header.json missing 'target_title' field")
+            data["target_title"] = ""
+        # Backward compatibility: convert old format to new format
+        if "title_line" in data and "target_title" not in data:
+            data["target_title"] = data.pop("title_line")
+        if "contact_info" in data:
+            contact_info = data.pop("contact_info")
+            if "name" not in data:
+                data["name"] = ""
+            if "location" not in data:
+                data["location"] = contact_info.get("location", "")
+            if "email" not in data:
+                data["email"] = contact_info.get("email", "")
+            if "phone" not in data:
+                data["phone"] = contact_info.get("phone", "")
+            if "links" not in data:
+                links = []
+                if contact_info.get("website"):
+                    links.append(contact_info["website"])
+                if contact_info.get("linkedin"):
+                    links.append(f"linkedin.com/in/{contact_info['linkedin']}")
+                if contact_info.get("github"):
+                    links.append(f"github.com/{contact_info['github']}")
+                if contact_info.get("google_scholar"):
+                    links.append(contact_info["google_scholar"])
+                data["links"] = links
         
         return data
     except FileNotFoundError:
-        logger.debug(f"header_block.json not found: {file_path} (optional file)")
-        return {"status": "success", "message": "File not found", "title_line": "", "contact_info": {}}
+        logger.debug(f"header.json not found: {file_path} (optional file)")
+        return {"status": "success", "message": "File not found", "name": "", "email": "", "target_title": ""}
     except json.JSONDecodeError as e:
-        logger.error(f"header_block.json: Invalid JSON - {e}")
-        return {"status": "error", "message": f"Invalid JSON: {e}", "title_line": "", "contact_info": {}}
+        logger.error(f"header.json: Invalid JSON - {e}")
+        return {"status": "error", "message": f"Invalid JSON: {e}", "name": "", "email": "", "target_title": ""}
     except Exception as e:
-        logger.error(f"header_block.json: Error reading file - {e}")
-        return {"status": "error", "message": str(e), "title_line": "", "contact_info": {}}
+        logger.error(f"header.json: Error reading file - {e}")
+        return {"status": "error", "message": str(e), "name": "", "email": "", "target_title": ""}
 
 
 def load_summary_block(file_path: Optional[Path] = None) -> Dict[str, Any]:
     """
-    Load summary_block.json with schema validation.
+    Load summary.json with schema validation.
     
-    Schema: {status: "success", message: string, summary: string}
+    Schema: {status: "success", message: string, summary: string, approx_word_count: number}
     """
     if file_path is None:
-        file_path = OUTPUT_DIR / "summary_block.json"
+        file_path = OUTPUT_DIR / "summary.json"
     
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -220,34 +261,37 @@ def load_summary_block(file_path: Optional[Path] = None) -> Dict[str, Any]:
         
         # Validate required fields
         if "status" not in data:
-            logger.warning(f"summary_block.json missing 'status' field")
+            logger.warning(f"summary.json missing 'status' field")
         if "message" not in data:
-            logger.warning(f"summary_block.json missing 'message' field")
+            logger.warning(f"summary.json missing 'message' field")
         if "summary" not in data:
-            logger.warning(f"summary_block.json missing 'summary' field")
+            logger.warning(f"summary.json missing 'summary' field")
             data["summary"] = ""
+        if "approx_word_count" not in data:
+            # Calculate word count if missing
+            data["approx_word_count"] = len(data.get("summary", "").split())
         
         return data
     except FileNotFoundError:
-        logger.error(f"summary_block.json not found: {file_path}")
-        return {"status": "error", "message": "File not found", "summary": ""}
+        logger.error(f"summary.json not found: {file_path}")
+        return {"status": "error", "message": "File not found", "summary": "", "approx_word_count": 0}
     except json.JSONDecodeError as e:
-        logger.error(f"summary_block.json: Invalid JSON - {e}")
-        return {"status": "error", "message": f"Invalid JSON: {e}", "summary": ""}
+        logger.error(f"summary.json: Invalid JSON - {e}")
+        return {"status": "error", "message": f"Invalid JSON: {e}", "summary": "", "approx_word_count": 0}
     except Exception as e:
-        logger.error(f"summary_block.json: Error reading file - {e}")
-        return {"status": "error", "message": str(e), "summary": ""}
+        logger.error(f"summary.json: Error reading file - {e}")
+        return {"status": "error", "message": str(e), "summary": "", "approx_word_count": 0}
 
 
 def load_education_block(file_path: Optional[Path] = None) -> Dict[str, Any]:
     """
-    Load education_block.json with schema validation.
+    Load education.json with schema validation.
     
     Schema: {status: "success", message: string, education: [{degree: string, institution: string, 
-             location?: string, dates: string, gpa?: string, honors?: string}]}
+             location?: string, dates?: string, honors?: string}]}
     """
     if file_path is None:
-        file_path = OUTPUT_DIR / "education_block.json"
+        file_path = OUTPUT_DIR / "education.json"
     
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -257,22 +301,22 @@ def load_education_block(file_path: Optional[Path] = None) -> Dict[str, Any]:
         
         # Validate required fields
         if "status" not in data:
-            logger.warning(f"education_block.json missing 'status' field")
+            logger.warning(f"education.json missing 'status' field")
         if "message" not in data:
-            logger.warning(f"education_block.json missing 'message' field")
+            logger.warning(f"education.json missing 'message' field")
         if "education" not in data:
-            logger.warning(f"education_block.json missing 'education' field")
+            logger.warning(f"education.json missing 'education' field")
             data["education"] = []
         
         return data
     except FileNotFoundError:
-        logger.debug(f"education_block.json not found: {file_path} (optional file)")
+        logger.debug(f"education.json not found: {file_path} (optional file)")
         return {"status": "success", "message": "File not found", "education": []}
     except json.JSONDecodeError as e:
-        logger.error(f"education_block.json: Invalid JSON - {e}")
+        logger.error(f"education.json: Invalid JSON - {e}")
         return {"status": "error", "message": f"Invalid JSON: {e}", "education": []}
     except Exception as e:
-        logger.error(f"education_block.json: Error reading file - {e}")
+        logger.error(f"education.json: Error reading file - {e}")
         return {"status": "error", "message": str(e), "education": []}
 
 
@@ -280,9 +324,8 @@ def load_ats_report(file_path: Optional[Path] = None) -> Dict[str, Any]:
     """
     Load ats_report.json with schema validation.
     
-    Schema: {status: "success"|"degraded"|"error", message: string, coverage_score: number, 
-             present_keywords: array, missing_keywords: array, recommendations: array, 
-             error_type?: string, hint?: string}
+    Schema: {status: "success"|"degraded"|"error", message: string, keyword_coverage: number, 
+             match_score: number, issues: [string], suggestions: [string]}
     """
     if file_path is None:
         file_path = OUTPUT_DIR / "ats_report.json"
@@ -298,43 +341,47 @@ def load_ats_report(file_path: Optional[Path] = None) -> Dict[str, Any]:
             logger.warning(f"ats_report.json missing 'status' field")
         if "message" not in data:
             logger.warning(f"ats_report.json missing 'message' field")
-        if "coverage_score" not in data:
-            logger.warning(f"ats_report.json missing 'coverage_score' field")
-            data["coverage_score"] = 0.0
-        if "present_keywords" not in data:
-            logger.warning(f"ats_report.json missing 'present_keywords' field")
-            data["present_keywords"] = []
-        if "missing_keywords" not in data:
-            logger.warning(f"ats_report.json missing 'missing_keywords' field")
-            data["missing_keywords"] = []
-        if "recommendations" not in data:
-            logger.warning(f"ats_report.json missing 'recommendations' field")
-            data["recommendations"] = []
+        if "keyword_coverage" not in data:
+            logger.warning(f"ats_report.json missing 'keyword_coverage' field")
+            data["keyword_coverage"] = 0.0
+        if "match_score" not in data:
+            logger.warning(f"ats_report.json missing 'match_score' field")
+            data["match_score"] = 0.0
+        if "issues" not in data:
+            logger.warning(f"ats_report.json missing 'issues' field")
+            data["issues"] = []
+        if "suggestions" not in data:
+            logger.warning(f"ats_report.json missing 'suggestions' field")
+            data["suggestions"] = []
+        # Backward compatibility: convert old format to new format
+        if "coverage_score" in data and "keyword_coverage" not in data:
+            data["keyword_coverage"] = data.pop("coverage_score")
+        if "recommendations" in data and "suggestions" not in data:
+            data["suggestions"] = data.pop("recommendations")
         
         return data
     except FileNotFoundError:
         logger.debug(f"ats_report.json not found: {file_path} (optional file)")
-        return {"status": "error", "message": "File not found", "coverage_score": 0.0, 
-                "present_keywords": [], "missing_keywords": [], "recommendations": []}
+        return {"status": "error", "message": "File not found", "keyword_coverage": 0.0, 
+                "match_score": 0.0, "issues": [], "suggestions": []}
     except json.JSONDecodeError as e:
         logger.error(f"ats_report.json: Invalid JSON - {e}")
-        return {"status": "error", "message": f"Invalid JSON: {e}", "coverage_score": 0.0,
-                "present_keywords": [], "missing_keywords": [], "recommendations": []}
+        return {"status": "error", "message": f"Invalid JSON: {e}", "keyword_coverage": 0.0,
+                "match_score": 0.0, "issues": [], "suggestions": []}
     except Exception as e:
         logger.error(f"ats_report.json: Error reading file - {e}")
-        return {"status": "error", "message": str(e), "coverage_score": 0.0,
-                "present_keywords": [], "missing_keywords": [], "recommendations": []}
+        return {"status": "error", "message": str(e), "keyword_coverage": 0.0,
+                "match_score": 0.0, "issues": [], "suggestions": []}
 
 
 def load_privacy_validation_report(file_path: Optional[Path] = None) -> Dict[str, Any]:
     """
-    Load privacy_validation_report.json with schema validation.
+    Load privacy_report.json with schema validation.
     
-    Schema: {status: "success"|"error", message: string, validation_status: "passed"|"failed"|"warning", 
-             issues: array, error_type?: string, hint?: string}
+    Schema: {status: "success"|"error", message: string, issues: [string], high_risk: [string]}
     """
     if file_path is None:
-        file_path = OUTPUT_DIR / "privacy_validation_report.json"
+        file_path = OUTPUT_DIR / "privacy_report.json"
     
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -344,35 +391,34 @@ def load_privacy_validation_report(file_path: Optional[Path] = None) -> Dict[str
         
         # Validate required fields
         if "status" not in data:
-            logger.warning(f"privacy_validation_report.json missing 'status' field")
+            logger.warning(f"privacy_report.json missing 'status' field")
         if "message" not in data:
-            logger.warning(f"privacy_validation_report.json missing 'message' field")
-        if "validation_status" not in data:
-            logger.warning(f"privacy_validation_report.json missing 'validation_status' field")
-            data["validation_status"] = "unknown"
+            logger.warning(f"privacy_report.json missing 'message' field")
         if "issues" not in data:
-            logger.warning(f"privacy_validation_report.json missing 'issues' field")
+            logger.warning(f"privacy_report.json missing 'issues' field")
             data["issues"] = []
+        if "high_risk" not in data:
+            logger.warning(f"privacy_report.json missing 'high_risk' field")
+            data["high_risk"] = []
         
         return data
     except FileNotFoundError:
-        logger.debug(f"privacy_validation_report.json not found: {file_path} (optional file)")
-        return {"status": "error", "message": "File not found", "validation_status": "unknown", "issues": []}
+        logger.debug(f"privacy_report.json not found: {file_path} (optional file)")
+        return {"status": "error", "message": "File not found", "issues": [], "high_risk": []}
     except json.JSONDecodeError as e:
-        logger.error(f"privacy_validation_report.json: Invalid JSON - {e}")
-        return {"status": "error", "message": f"Invalid JSON: {e}", "validation_status": "unknown", "issues": []}
+        logger.error(f"privacy_report.json: Invalid JSON - {e}")
+        return {"status": "error", "message": f"Invalid JSON: {e}", "issues": [], "high_risk": []}
     except Exception as e:
-        logger.error(f"privacy_validation_report.json: Error reading file - {e}")
-        return {"status": "error", "message": str(e), "validation_status": "unknown", "issues": []}
+        logger.error(f"privacy_report.json: Error reading file - {e}")
+        return {"status": "error", "message": str(e), "issues": [], "high_risk": []}
 
 
 def load_cover_letter(file_path: Optional[Path] = None) -> Dict[str, Any]:
     """
     Load cover_letter.json with schema validation.
     
-    Schema: {ok: boolean, status: "success"|"error", message: string, cover_letter_md: string, 
-             keywords_used: array, skills_alignment: array, red_flags: array, 
-             meta: {word_count: number, jd_available: boolean}, error_type: string|null, hint: string|null}
+    Schema: {status: "success"|"error", message: string, cover_letter_md: string,
+             word_count: number, keywords_used: [string], skills_alignment: [string], red_flags: [string]}
     """
     if file_path is None:
         file_path = OUTPUT_DIR / "cover_letter.json"
@@ -384,8 +430,6 @@ def load_cover_letter(file_path: Optional[Path] = None) -> Dict[str, Any]:
             data = json.loads(cleaned_content)
         
         # Validate required fields
-        if "ok" not in data:
-            logger.warning(f"cover_letter.json missing 'ok' field")
         if "status" not in data:
             logger.warning(f"cover_letter.json missing 'status' field")
         if "message" not in data:
@@ -393,6 +437,9 @@ def load_cover_letter(file_path: Optional[Path] = None) -> Dict[str, Any]:
         if "cover_letter_md" not in data:
             logger.warning(f"cover_letter.json missing 'cover_letter_md' field")
             data["cover_letter_md"] = ""
+        if "word_count" not in data:
+            # Calculate word count if missing
+            data["word_count"] = len(data.get("cover_letter_md", "").split())
         if "keywords_used" not in data:
             logger.warning(f"cover_letter.json missing 'keywords_used' field")
             data["keywords_used"] = []
@@ -402,26 +449,24 @@ def load_cover_letter(file_path: Optional[Path] = None) -> Dict[str, Any]:
         if "red_flags" not in data:
             logger.warning(f"cover_letter.json missing 'red_flags' field")
             data["red_flags"] = []
-        if "meta" not in data:
-            logger.warning(f"cover_letter.json missing 'meta' field")
-            data["meta"] = {"word_count": 0, "jd_available": False}
+        # Backward compatibility: convert old format to new format
+        if "meta" in data and isinstance(data["meta"], dict):
+            if "word_count" not in data and "word_count" in data["meta"]:
+                data["word_count"] = data["meta"].pop("word_count")
         
         return data
     except FileNotFoundError:
         logger.debug(f"cover_letter.json not found: {file_path} (optional file)")
-        return {"ok": False, "status": "error", "message": "File not found", "cover_letter_md": "",
-                "keywords_used": [], "skills_alignment": [], "red_flags": [],
-                "meta": {"word_count": 0, "jd_available": False}, "error_type": None, "hint": None}
+        return {"status": "error", "message": "File not found", "cover_letter_md": "",
+                "word_count": 0, "keywords_used": [], "skills_alignment": [], "red_flags": []}
     except json.JSONDecodeError as e:
         logger.error(f"cover_letter.json: Invalid JSON - {e}")
-        return {"ok": False, "status": "error", "message": f"Invalid JSON: {e}", "cover_letter_md": "",
-                "keywords_used": [], "skills_alignment": [], "red_flags": [],
-                "meta": {"word_count": 0, "jd_available": False}, "error_type": None, "hint": None}
+        return {"status": "error", "message": f"Invalid JSON: {e}", "cover_letter_md": "",
+                "word_count": 0, "keywords_used": [], "skills_alignment": [], "red_flags": []}
     except Exception as e:
         logger.error(f"cover_letter.json: Error reading file - {e}")
-        return {"ok": False, "status": "error", "message": str(e), "cover_letter_md": "",
-                "keywords_used": [], "skills_alignment": [], "red_flags": [],
-                "meta": {"word_count": 0, "jd_available": False}, "error_type": None, "hint": None}
+        return {"status": "error", "message": str(e), "cover_letter_md": "",
+                "word_count": 0, "keywords_used": [], "skills_alignment": [], "red_flags": []}
 
 
 def load_template_fix_report(file_path: Optional[Path] = None) -> Dict[str, Any]:
@@ -445,9 +490,12 @@ def load_template_fix_report(file_path: Optional[Path] = None) -> Dict[str, Any]
             logger.warning(f"template_fix_report.json missing 'status' field")
         if "message" not in data:
             logger.warning(f"template_fix_report.json missing 'message' field")
-        if "changes_made" not in data:
-            logger.warning(f"template_fix_report.json missing 'changes_made' field")
-            data["changes_made"] = []
+        if "changes" not in data:
+            logger.warning(f"template_fix_report.json missing 'changes' field")
+            data["changes"] = []
+        # Backward compatibility: convert old format to new format
+        if "changes_made" in data and "changes" not in data:
+            data["changes"] = data.pop("changes_made")
         if "template_path" not in data:
             logger.warning(f"template_fix_report.json missing 'template_path' field")
             data["template_path"] = ""

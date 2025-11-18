@@ -1,0 +1,20 @@
+{
+  "projects": [
+    {
+      "title": "Multi-Robot Simulation Platform",
+      "bullets": [
+        "Developed a multi-robot simulation platform in ROS2, improving task efficiency and enabling automated testing for diverse experimental evaluations.",
+        "Scaled simulation from Webots to ROS2, enhancing collaboration and technical decision-making in navigation agents development.",
+        "Mentored peers in developing navigation agents, fostering skills in QA and data visualization for improved project outcomes."
+      ]
+    },
+    {
+      "title": "Quantized Spiking Neural Network",
+      "bullets": [
+        "Engineered an 8-bit quantized spiking neural network for embedded deployment using PyTorch, enhancing power efficiency through custom quantization methods.",
+        "Collaborated on automated testing pipelines to ensure quality assurance and improve system reliability.",
+        "Mentored team members in technical decision-making and data visualization techniques."
+      ]
+    }
+  ]
+}

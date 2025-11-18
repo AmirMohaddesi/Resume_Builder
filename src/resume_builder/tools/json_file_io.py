@@ -17,21 +17,6 @@ from resume_builder.utils import clean_json_content
 from resume_builder.paths import PROJECT_ROOT, OUTPUT_DIR
 
 # Module-level cache shared between ReadJsonFileTool and WriteJsonFileTool
-# File path to agent/task mapping for better logging (only active agents)
-_FILE_TO_AGENT_MAP = {
-    "parsed_jd.json": "jd_analyst",
-    "selected_experiences.json": "experience_selector",
-    "selected_projects.json": "project_selector",
-    "selected_skills.json": "skill_selector",
-    "summary_block.json": "summary_writer",
-    "education_block.json": "education_writer",
-    "header_block.json": "header_writer",
-    "ats_report.json": "ats_checker",
-    "privacy_validation_report.json": "privacy_guard",
-    "cover_letter.json": "coverletter_generator",
-}
-
-# Module-level cache shared between ReadJsonFileTool and WriteJsonFileTool
 # Using module-level dict to avoid Pydantic ModelPrivateAttr issues
 _json_file_cache: dict[str, dict[str, Any]] = {}
 _json_cache_timestamps: dict[str, float] = {}
@@ -169,14 +154,13 @@ class WriteJsonFileTool(BaseTool):
     )
     args_schema: Type[BaseModel] = WriteJsonFileInput
     
-    @staticmethod
-    def _infer_agent_from_file(file_name: str) -> str:
-        """Infer which agent/task is writing based on file name."""
-        return _FILE_TO_AGENT_MAP.get(file_name, "unknown_agent")
-    
     def _run(self, file_path: str, data: str) -> str:
         """Write JSON data to file with atomic write and validation."""
         try:
+            # Input validation
+            if not data or not data.strip():
+                return "[error] JSON data is empty"
+            
             json_file = Path(file_path)
             if not json_file.is_absolute():
                 # Try resolving relative to OUTPUT_DIR first (most common case)
@@ -186,12 +170,7 @@ class WriteJsonFileTool(BaseTool):
                     # Try relative to PROJECT_ROOT
                     json_file = PROJECT_ROOT / file_path
             
-            # Infer which agent/task is calling based on file path
-            file_name = json_file.name
-            agent_hint = self._infer_agent_from_file(file_name)
-            
-            # Log tool invocation at debug level (CrewAI already logs tool calls)
-            logger.debug(f"[TOOL] write_json_file called by {agent_hint} for: {json_file} (data length: {len(data)} chars)")
+            logger.debug(f"Writing JSON file: {json_file} ({len(data)} chars)")
             
             # Ensure parent directory exists
             if not json_file.parent.exists():
@@ -202,20 +181,20 @@ class WriteJsonFileTool(BaseTool):
             cleaned_data = clean_json_content(data)
             
             if not cleaned_data:
-                logger.error(f"[TOOL] write_json_file failed: JSON data is empty after cleaning for {json_file}")
-                return f"[error] JSON data is empty after cleaning"
+                logger.error(f"JSON data is empty after cleaning for {json_file}")
+                return "[error] JSON data is empty after cleaning"
             
             # Parse the JSON string to validate it
             try:
                 parsed_data = json.loads(cleaned_data)
             except json.JSONDecodeError as e:
-                logger.error(f"[TOOL] write_json_file failed: Invalid JSON data for {json_file}: {str(e)}")
+                logger.error(f"Invalid JSON data for {json_file}: {str(e)}")
                 logger.debug(f"Data preview (first 500 chars): {cleaned_data[:500]}")
                 return f"[error] Invalid JSON data: {str(e)}. Please ensure the data is valid JSON."
             
             # Validate basic schema: should be a dict/object (not array or primitive)
             if not isinstance(parsed_data, dict):
-                logger.error(f"[TOOL] write_json_file failed: JSON data must be an object (dict), got {type(parsed_data).__name__} for {json_file}")
+                logger.error(f"JSON data must be an object (dict), got {type(parsed_data).__name__} for {json_file}")
                 return f"[error] JSON data must be an object (dict), got {type(parsed_data).__name__}"
             
             # Atomic write: write to temp file first, then rename
@@ -228,10 +207,9 @@ class WriteJsonFileTool(BaseTool):
                 # Atomic rename (works on Windows and Unix)
                 temp_file.replace(json_file)
                 
-                # Log success at debug level (CrewAI already logs tool results)
-                logger.debug(f"[TOOL] write_json_file SUCCESS: Wrote {json_file} ({len(formatted_json)} chars)")
+                logger.debug(f"Wrote JSON file: {json_file} ({len(formatted_json)} chars)")
             except Exception as e:
-                logger.error(f"[TOOL] write_json_file failed: Exception during file write for {json_file}: {e}")
+                logger.error(f"Exception during file write for {json_file}: {e}", exc_info=True)
                 # Clean up temp file if rename failed
                 if temp_file.exists():
                     try:
@@ -251,6 +229,6 @@ class WriteJsonFileTool(BaseTool):
             
         except Exception as e:
             error_msg = f"Failed to write JSON file: {str(e)}"
-            logger.error(f"[TOOL] write_json_file EXCEPTION: {error_msg}", exc_info=True)
+            logger.error(error_msg, exc_info=True)
             return f"[error] {error_msg}"
 

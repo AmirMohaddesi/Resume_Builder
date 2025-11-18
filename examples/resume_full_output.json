@@ -1,0 +1,244 @@
+{
+  "profile": {
+    "status": "success",
+    "message": "Job description parsed successfully.",
+    "title": "Sr. Software Developer",
+    "company": "Apple",
+    "location": "Cupertino, California, United States",
+    "seniority": "Senior",
+    "focus_area": "Automated Software Testing and Infrastructure",
+    "skills": [
+      "Python",
+      "Swift",
+      "Scala",
+      "CI/CD",
+      "Jenkins",
+      "Unix commands",
+      "Shell scripting",
+      "Object-oriented design",
+      "Data structures",
+      "Algorithm design",
+      "Postgres",
+      "Cassandra",
+      "Tableau",
+      "Kafka",
+      "RabbitMQ",
+      "DevOps",
+      "Ansible",
+      "Splunk",
+      "Kubernetes",
+      "XCTest",
+      "XCUI"
+    ],
+    "keywords": [
+      "automated testing",
+      "testing pipelines",
+      "QA",
+      "infrastructure",
+      "technical specifications",
+      "software quality",
+      "mentoring",
+      "collaboration",
+      "root cause analysis",
+      "software project",
+      "production"
+    ],
+    "cleaned_text": "This senior software developer role at Apple in Cupertino focuses on building and maintaining automated testing tools and infrastructure for applications across multiple platforms including devices, web, and backend services. The candidate should have strong programming skills in Python and other object-oriented languages, expertise with CI/CD tools and Unix scripting, and a solid foundation in computer science fundamentals. Responsibilities include building testing pipelines, designing infrastructure for diverse Apple apps, and developing tools for QA issue pattern recognition. The role involves technical decision-making, mentoring, and collaboration across teams. Preferred experience includes working with databases such as Postgres and Cassandra, data visualization tools like Tableau, message queues such as Kafka and RabbitMQ, various DevOps tools, and Apple testing platforms XCTest and XCUI. The role offers competitive pay and benefits along with opportunities for growth and inclusion."
+  },
+  "experiences": {
+    "status": "success",
+    "message": "Selected experiences aligned with Sr. Software Developer role at Apple, focused on automated testing and infrastructure.",
+    "selected_experiences": [
+      {
+        "id": 1,
+        "title": "Graduate Researcher",
+        "company": "CARL Lab, University of California, Irvine",
+        "location": "Irvine, CA",
+        "dates": "Sep 2021 - Jun 2025",
+        "priority": 1,
+        "bullets": [
+          "Built scalable multi-robot simulation platform in ROS2 using Python and Linux to enable automated testing of navigation and coordination algorithms.",
+          "Developed test infrastructure simulating realistic multi-agent environments ensuring robustness and performance of autonomous navigation software.",
+          "Automated data collection and analysis pipelines measuring task effectiveness and collaboration, improving test accuracy and repeatability.",
+          "Collaborated cross-functionally to enhance simulation modules supporting iterative software validation and integration testing."
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Assistant",
+        "company": "NMI Lab, University of California, Irvine",
+        "location": "Irvine, CA",
+        "dates": "Jul 2020 - Jul 2021",
+        "priority": 2,
+        "bullets": [
+          "Developed power-efficient 8-bit quantized spiking neural networks using PyTorch and automated training evaluation pipelines with Python.",
+          "Optimized model deployment workflows for embedded systems with testing automation ensuring accuracy and performance under power constraints.",
+          "Streamlined software pipelines facilitating continuous model development and testing, reducing manual intervention and accelerating iteration cycles."
+        ]
+      }
+    ]
+  },
+  "projects": {
+    "status": "success",
+    "message": "Selected 3 projects aligned with senior software developer JD.",
+    "selected_projects": [
+      {
+        "name": "Alter Ego: Personalized Conversational AI",
+        "priority": 1,
+        "bullets": [
+          "Designed and deployed a conversational AI agent using Python and OpenAI API, demonstrating expertise in AI-focused software tool development.",
+          "Built scalable, maintainable software architecture aligning with automated testing tool development practices.",
+          "Leveraged modern scripting and integration techniques to ensure robust application deployment and operation."
+        ]
+      },
+      {
+        "name": "Multi-Robot Coordination and Distributed Control System",
+        "priority": 1,
+        "bullets": [
+          "Developed a ROS2-based simulation platform to coordinate multi-robot teams for complex tasks, showcasing infrastructure design skills.",
+          "Implemented distributed control algorithms to improve system robustness and efficiency in dynamic environments.",
+          "Collaborated with cross-functional teams to refine simulation tools, reflecting strong technical collaboration and mentoring abilities."
+        ]
+      },
+      {
+        "name": "Benefits of Varying Navigation Strategies in Teams of Robots",
+        "priority": 2,
+        "bullets": [
+          "Investigated algorithmic strategies impact on multi-robot team efficiency, aligning with foundational algorithm design and system optimization.",
+          "Conducted extensive simulations with ROS2 and Webots to assess performance and coordination behaviors.",
+          "Applied data-driven analysis to support decision-making, relevant to quality assurance and software project evaluation."
+        ]
+      }
+    ]
+  },
+  "skills": {
+    "status": "success",
+    "message": "Selected skills aligned with job description, grouped and de-duplicated.",
+    "skills": [
+      "Python",
+      "C++",
+      "Swift",
+      "Scala",
+      "Shell scripting",
+      "SQL",
+      "CI/CD",
+      "Jenkins",
+      "Ansible",
+      "Kubernetes",
+      "Postgres",
+      "Cassandra",
+      "XCTest",
+      "XCUI",
+      "Linux (Ubuntu)",
+      "Git",
+      "Docker",
+      "Automated testing",
+      "Object-oriented design",
+      "Algorithm design"
+    ],
+    "groups": {
+      "Programming Languages": [
+        "Python",
+        "C++",
+        "Swift",
+        "Scala",
+        "Shell scripting",
+        "SQL"
+      ],
+      "Frameworks & Libraries": [
+        "PyTorch",
+        "TensorFlow",
+        "OpenCV",
+        "scikit-learn",
+        "Keras",
+        "NumPy",
+        "Pandas"
+      ],
+      "Tools & Platforms": [
+        "Linux (Ubuntu)",
+        "Windows",
+        "Git",
+        "Docker",
+        "Jupyter"
+      ],
+      "DevOps & CI/CD": [
+        "CI/CD",
+        "Jenkins",
+        "Ansible",
+        "Kubernetes"
+      ],
+      "Databases": [
+        "Postgres",
+        "Cassandra"
+      ],
+      "Testing & QA": [
+        "XCTest",
+        "XCUI",
+        "Automated testing"
+      ],
+      "Concepts & Methodologies": [
+        "Object-oriented design",
+        "Data structures",
+        "Algorithm design",
+        "Unix commands",
+        "Root cause analysis"
+      ]
+    }
+  },
+  "header": {
+    "status": "success",
+    "message": "Header and target title created based on profile and job description.",
+    "name": "Amirhosein Mohaddesi",
+    "location": "Cupertino, California, United States",
+    "email": "amir.mohaddesi@gmail.com",
+    "phone": "9494268113",
+    "links": [
+      "https://amirmohaddesi.github.io/",
+      "https://linkedin.com/in/amohaddesi",
+      "https://github.com/AmirMohaddesi"
+    ],
+    "target_title": "Sr. Software Developer"
+  },
+  "summary": {
+    "status": "success",
+    "message": "Summary generated based on candidate's experience and job description alignment.",
+    "summary": "Senior software developer with 4 years of specialized experience in automated testing and infrastructure, focusing on multi-robot simulation testing platforms using ROS2, Python, and Linux. Proven expertise in developing and maintaining automated testing pipelines, leveraging CI/CD tools such as Jenkins, Ansible, and Kubernetes to enhance software quality and deployment infrastructure. Skilled in Python, Swift, Scala, shell scripting, and QA tools, with strong capabilities in root cause analysis, collaboration, and continuous integration to drive robust software testing and infrastructure solutions.",
+    "approx_word_count": 88
+  },
+  "education": {
+    "status": "success",
+    "message": "Education section created with highest-value degrees",
+    "education": [
+      {
+        "degree": "Ph.D. in Information and Computer Science (ICS)",
+        "institution": "University of California, Irvine",
+        "location": "Irvine, CA",
+        "dates": "Sep 2019 – Jun 2025"
+      },
+      {
+        "degree": "B.S. in Computer Engineering",
+        "institution": "Sharif University of Technology",
+        "location": "Tehran, Iran",
+        "dates": "Sep 2015 – Jun 2019"
+      }
+    ]
+  },
+  "ats_report": {
+    "status": "success",
+    "message": "ATS/readability report generated.",
+    "keyword_coverage": 65,
+    "match_score": 70,
+    "issues": [
+      "Missing explicit experience with Tableau, Kafka, RabbitMQ, Splunk.",
+      "No explicit mention of mentoring or leadership roles.",
+      "Collaboration and root cause analysis could be more emphasized.",
+      "Limited mention of production or deployment environments."
+    ],
+    "suggestions": [
+      "Add experience/projects involving Tableau, Kafka, RabbitMQ, or Splunk if applicable.",
+      "Highlight mentoring or leadership roles explicitly.",
+      "Emphasize collaboration and root cause analysis contributions more.",
+      "Include more details on production environment or deployment responsibilities."
+    ]
+  }
+}

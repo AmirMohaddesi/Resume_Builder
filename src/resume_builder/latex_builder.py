@@ -5,10 +5,13 @@ Agents output JSON, Python handles all LaTeX syntax.
 import json
 import re
 import unicodedata
+import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 from resume_builder.utils import clean_json_content, extract_braces
+
+logger = logging.getLogger(__name__)
 
 
 class LaTeXBuilder:
@@ -216,17 +219,55 @@ class LaTeXBuilder:
         
         return '\n'.join(preamble_parts)
     
-    def build_header(self, title_line: str, contact_info: Dict[str, Any]) -> str:
+    def build_header(self, title_line: str = None, contact_info: Dict[str, Any] = None, 
+                     header_data: Dict[str, Any] = None) -> str:
         """Build tailored header section with title line and contact information table.
         
         Args:
-            title_line: Job-relevant keywords separated by pipes (e.g., "AI/ML Engineer | Robotics & Agentic AI")
-            contact_info: Dictionary with phone, email, location, website, linkedin, github, google_scholar
+            title_line: (Deprecated) Job-relevant keywords separated by pipes. Use header_data instead.
+            contact_info: (Deprecated) Dictionary with phone, email, location, website, linkedin, github, google_scholar. Use header_data instead.
+            header_data: New format dictionary with name, location, email, phone, links, target_title
         
         Returns:
             LaTeX code for header section matching user's format exactly
         """
         parts = []
+        
+        # Support new format (header_data) or old format (title_line + contact_info)
+        if header_data:
+            target_title = header_data.get('target_title', '')
+            name = header_data.get('name', '')
+            location = header_data.get('location', '')
+            email = header_data.get('email', '')
+            phone = header_data.get('phone', '')
+            links = header_data.get('links', [])
+            
+            # target_title is metadata only - do NOT display it in the header
+            # The old format used title_line for display, but new format doesn't show target_title
+            title_line = ''  # Don't display target_title - it's just metadata
+            contact_info = {
+                'phone': phone,
+                'email': email,
+                'location': location,
+            }
+            # Parse links array into individual fields
+            for link in links:
+                link_str = str(link).lower()
+                if 'linkedin.com' in link_str or link_str.startswith('linkedin'):
+                    contact_info['linkedin'] = link.split('/')[-1] if '/' in link else link
+                elif 'github.com' in link_str or link_str.startswith('github'):
+                    contact_info['github'] = link.split('/')[-1] if '/' in link else link
+                elif 'scholar.google' in link_str or 'google.com/scholar' in link_str:
+                    contact_info['google_scholar'] = link
+                elif link_str.startswith('http'):
+                    contact_info['website'] = link
+        else:
+            # Old format - use provided parameters or defaults
+            title_line = title_line or ''
+            contact_info = contact_info or {}
+            phone = contact_info.get('phone', '').strip()
+            email = contact_info.get('email', '').strip()
+            location = contact_info.get('location', '').strip()
         
         # Title line (centered, bold) - replace | with \textbar{} for LaTeX
         if title_line:
@@ -241,9 +282,10 @@ class LaTeXBuilder:
         row2_parts = []
         
         # Row 1: Phone (col 1), Email (cols 2-3 with multicolumn), Location (col 4)
-        phone = contact_info.get('phone', '').strip()
-        email = contact_info.get('email', '').strip()
-        location = contact_info.get('location', '').strip()
+        if not header_data:
+            phone = contact_info.get('phone', '').strip()
+            email = contact_info.get('email', '').strip()
+            location = contact_info.get('location', '').strip()
         
         if phone:
             formatted_phone = self.format_phone(phone)
@@ -258,10 +300,27 @@ class LaTeXBuilder:
             row1_parts.append(f"\\enspace\\faHome\\enspace {escaped_location}")
         
         # Row 2: Website, LinkedIn, GitHub, Google Scholar (1 col each)
-        website = contact_info.get('website', '').strip()
-        linkedin = contact_info.get('linkedin', '').strip()
-        github = contact_info.get('github', '').strip()
-        google_scholar = contact_info.get('google_scholar', '').strip()
+        if not header_data:
+            website = contact_info.get('website', '').strip()
+            linkedin = contact_info.get('linkedin', '').strip()
+            github = contact_info.get('github', '').strip()
+            google_scholar = contact_info.get('google_scholar', '').strip()
+        else:
+            # Extract from links array
+            website = ''
+            linkedin = ''
+            github = ''
+            google_scholar = ''
+            for link in links:
+                link_str = str(link).lower()
+                if 'linkedin.com' in link_str or link_str.startswith('linkedin'):
+                    linkedin = link.split('/')[-1] if '/' in link else link
+                elif 'github.com' in link_str or link_str.startswith('github'):
+                    github = link.split('/')[-1] if '/' in link else link
+                elif 'scholar.google' in link_str or 'google.com/scholar' in link_str:
+                    google_scholar = link
+                elif link_str.startswith('http'):
+                    website = link
         
         if website:
             website_url = self.format_url(website)
@@ -269,11 +328,11 @@ class LaTeXBuilder:
             row2_parts.append(f"\\color{{blue}} {{$\\mathbb{{W}}$}} \\href{{{website_url}}}{{Personal Website}}")
         
         if linkedin:
-            linkedin_url = f"https://www.linkedin.com/in/{linkedin}"
+            linkedin_url = f"https://www.linkedin.com/in/{linkedin}" if not linkedin.startswith('http') else linkedin
             row2_parts.append(f"\\enspace\\faLinkedin\\enspace \\color{{blue}} \\href{{{linkedin_url}}}{{{self.escape_latex(linkedin)}}}")
         
         if github:
-            github_url = f"https://github.com/{github}"
+            github_url = f"https://github.com/{github}" if not github.startswith('http') else github
             row2_parts.append(f"\\enspace\\faGithub\\enspace \\color{{blue}} \\href{{{github_url}}}{{{self.escape_latex(github)}}}")
         
         if google_scholar:
@@ -284,12 +343,20 @@ class LaTeXBuilder:
         if row1_parts or row2_parts:
             table_content = []
             if row1_parts:
-                # Pad row1 to 4 columns if needed (email takes 2 cols, so we need to adjust)
-                # Phone (1) + Email (2) + Location (1) = 4 columns total
-                # If we have fewer than 4 items, pad with empty cells (use \phantom{} to prevent rendering issues)
-                while len(row1_parts) < 4:
-                    row1_parts.append('\\phantom{}')  # Use phantom to prevent empty cell rendering issues
-                row1_str = ' & '.join(row1_parts[:4]) + ' \\\\'
+                # Row 1 structure: Phone (1 col) + Email with multicolumn (2 cols) + Location (1 col) = 4 cols total
+                # Email uses \multicolumn{2}{c}, so row1_parts should have exactly 3 items when email is present
+                # Don't pad if we already have the correct structure (phone, email, location)
+                # Only pad if we're missing items (e.g., no email means we need to adjust)
+                has_email_multicolumn = any('\\multicolumn{2}{c}' in part for part in row1_parts)
+                if has_email_multicolumn:
+                    # With multicolumn email, we should have 3 items max (phone, email, location)
+                    # This represents 4 columns: 1 + 2 + 1
+                    row1_str = ' & '.join(row1_parts) + ' \\\\'
+                else:
+                    # No multicolumn email, pad to 4 columns normally
+                    while len(row1_parts) < 4:
+                        row1_parts.append('\\phantom{}')
+                    row1_str = ' & '.join(row1_parts[:4]) + ' \\\\'
                 table_content.append(row1_str)
                 table_content.append("\\hline")
             
@@ -301,7 +368,10 @@ class LaTeXBuilder:
                 table_content.append(row2_str)
             
             # Always use 4 columns (c c c c) to match user's format
+            # Note: Use single braces in LaTeX output (double braces in f-string are for escaping)
             table_latex = f"\\begin{{center}}\\begin{{tabular}}{{ c c c c }}\n" + "\n".join(table_content) + "\n\\end{{tabular}}\\end{{center}}"
+            # Fix double braces issue: replace {{ with { and }} with } for tabular/center tags
+            table_latex = table_latex.replace("\\end{{tabular}}", "\\end{tabular}").replace("\\end{{center}}", "\\end{center}")
             parts.append(table_latex)
         
         result = "\n".join(parts) if parts else ""
@@ -332,13 +402,20 @@ class LaTeXBuilder:
     def build_experience_entry(self, exp: Dict[str, Any]) -> str:
         """Build a single experience entry using cventry."""
         title = self.escape_latex(exp.get('title', ''))
-        organization = self.escape_latex(exp.get('organization', ''))
+        # Support both old (organization) and new (company) field names
+        company = self.escape_latex(exp.get('company', exp.get('organization', '')))
         location = self.escape_latex(exp.get('location', ''))
         dates = self.escape_latex(exp.get('dates', ''))
         
-        # Build description with bullet points - allow LaTeX commands in descriptions
+        # Build description with bullet points - support both old (description) and new (bullets) field names
         description_lines = []
-        if 'description' in exp and exp['description']:
+        bullets = exp.get('bullets', [])
+        if bullets:
+            for item in bullets:
+                escaped_item = self.escape_latex(str(item), keep_commands=True)
+                description_lines.append(f"  \\item {escaped_item}")
+        elif 'description' in exp and exp['description']:
+            # Backward compatibility: handle old description field
             if isinstance(exp['description'], list):
                 for item in exp['description']:
                     escaped_item = self.escape_latex(item, keep_commands=True)
@@ -354,12 +431,12 @@ class LaTeXBuilder:
         else:
             description = ""
         
-        # cventry format: {dates}{title}{organization}{location}{description}
+        # cventry format: {dates}{title}{company}{location}{description}
         # For empty descriptions, use {}{} with no inner newline to avoid spurious vertical gaps
         if description:
-            return f"\\cventry{{{dates}}}{{{title}}}{{{organization}}}{{{location}}}{{}}{{{description}}}\n"
+            return f"\\cventry{{{dates}}}{{{title}}}{{{company}}}{{{location}}}{{}}{{{description}}}\n"
         else:
-            return f"\\cventry{{{dates}}}{{{title}}}{{{organization}}}{{{location}}}{{}}{{}}\n"
+            return f"\\cventry{{{dates}}}{{{title}}}{{{company}}}{{{location}}}{{}}{{}}\n"
     
     def build_experience_section(self, experiences: List[Dict[str, Any]], max_entries_per_page: Optional[int] = None) -> str:
         """Build complete experience section with optional page breaks."""
@@ -387,7 +464,7 @@ class LaTeXBuilder:
         location = self.escape_latex(edu.get('location', ''))
         dates = self.escape_latex(edu.get('dates', ''))
         
-        # Optional: GPA, honors, etc.
+        # Optional: honors (gpa removed in new schema, but keep backward compatibility)
         details = []
         if edu.get('gpa'):
             details.append(f"GPA: {edu['gpa']}")
@@ -406,20 +483,36 @@ class LaTeXBuilder:
         entries = [self.build_education_entry(edu) for edu in education]
         return "\\section*{Education}\n" + '\n'.join(entries)
     
-    def build_skills_section(self, skills: List[str]) -> str:
-        """Build skills section."""
-        if not skills:
+    def build_skills_section(self, skills: List[str], groups: Optional[Dict[str, List[str]]] = None) -> str:
+        """Build skills section.
+        
+        Args:
+            skills: List of skill strings
+            groups: Optional dictionary mapping group names to lists of skills
+        """
+        if not skills and not groups:
             return ""
         
-        # Group skills into a compact format
-        escaped_skills = [self.escape_latex(skill) for skill in skills]
-        skills_text = ', '.join(escaped_skills)
+        # If groups are provided, use them; otherwise use flat skills list
+        if groups:
+            sections = []
+            for group_name, group_skills in groups.items():
+                if group_skills:
+                    escaped_skills = [self.escape_latex(skill) for skill in group_skills]
+                    skills_text = ', '.join(escaped_skills)
+                    escaped_group_name = self.escape_latex(group_name)
+                    sections.append(f"\\textbf{{{escaped_group_name}}}: {skills_text}")
+            skills_text = ' | '.join(sections)
+        else:
+            # Flat list
+            escaped_skills = [self.escape_latex(skill) for skill in skills]
+            skills_text = ', '.join(escaped_skills)
         
         # Wrap in sloppypar to avoid overfull boxes with long skill lists
         return f"\\section*{{Skills}}\n\\begin{{sloppypar}}{skills_text}\\end{{sloppypar}}\n"
     
     def build_projects_section(self, projects: List[Dict[str, Any]], max_entries_per_page: Optional[int] = None) -> str:
-        """Build projects section with optional page breaks."""
+        """Build compact projects section with space-efficient formatting."""
         if not projects:
             return ""
         
@@ -427,8 +520,23 @@ class LaTeXBuilder:
         for proj in projects:
             # Allow LaTeX commands in project names and descriptions (users often paste \textit{} or inline math)
             name = self.escape_latex(proj.get('name', ''), keep_commands=True)
-            description = self.escape_latex(proj.get('description', ''), keep_commands=True)
             url = proj.get('url', '')
+            
+            # Support both old (description) and new (bullets) field names
+            bullets = proj.get('bullets', [])
+            if bullets:
+                # Use compact inline format: "• bullet1 • bullet2" instead of itemize list
+                # This saves significant vertical space
+                bullet_texts = []
+                for bullet in bullets:
+                    escaped_bullet = self.escape_latex(str(bullet), keep_commands=True)
+                    bullet_texts.append(f"\\textbullet\\enspace {escaped_bullet}")
+                description = " ".join(bullet_texts)
+            elif 'description' in proj:
+                # Backward compatibility: handle old description field
+                description = self.escape_latex(proj.get('description', ''), keep_commands=True)
+            else:
+                description = ""
             
             if url:
                 url_formatted = self.format_url(url)
@@ -440,12 +548,20 @@ class LaTeXBuilder:
             # Avoid double bold if name already contains a command (e.g., user pasted \textbf{...})
             name_display = name_with_link if re.search(r'\\[a-zA-Z]+', name_with_link) else f"\\textbf{{{name_with_link}}}"
             
+            # Use compact format: name and description on same line with minimal spacing
             # Use thin space in label (some ModernCV forks don't accept truly empty {})
-            entries.append(f"\\cvitem{{~}}{{{name_display}: {description}}}\n")
+            if description:
+                # Compact format: name: description (all on one line, saves vertical space)
+                entries.append(f"\\cvitem{{~}}{{{name_display}: {description}}}\n")
+            else:
+                entries.append(f"\\cvitem{{~}}{{{name_display}}}\n")
+        
+        # Use compact section header (reduced spacing)
+        section_header = "\\section*{Projects}\n"
         
         # Add page breaks if specified
         if max_entries_per_page and len(entries) > max_entries_per_page:
-            result = ["\\section*{Projects}\n"]
+            result = [section_header]
             for i, entry in enumerate(entries):
                 result.append(entry)
                 # Insert soft page break after every max_entries_per_page entries (except the last)
@@ -453,7 +569,7 @@ class LaTeXBuilder:
                     result.append("\\pagebreak[2]\n")  # [2] = preferred but not forced
             return ''.join(result)
         
-        return "\\section*{Projects}\n" + ''.join(entries)
+        return section_header + ''.join(entries)
     
     def _ensure_required_packages(self, latex_content: str) -> str:
         """
@@ -594,28 +710,41 @@ class LaTeXBuilder:
         summary_section = self.build_summary(summary)
         experience_section = self.build_experience_section(experiences)
         education_section = self.build_education_section(education)
-        skills_section = self.build_skills_section(skills)
+        # Handle skills - support both old (skills list) and new (skills_data dict) formats
+        # If skills is a dict with 'skills' key, treat it as skills_data
+        if isinstance(skills, dict) and 'skills' in skills:
+            skills_list = skills.get('skills', [])
+            groups = skills.get('groups')
+            skills_section = self.build_skills_section(skills_list, groups)
+        else:
+            skills_section = self.build_skills_section(skills if skills else [])
         projects_section = self.build_projects_section(projects) if projects else ""
         
         # Build header section if header_data is provided
         header_section = ""
         if header_data:
-            title_line = header_data.get('title_line', '')
-            contact_info = header_data.get('contact_info', {})
-            # Fallback to identity if contact_info is empty
-            if not contact_info and identity:
-                identity_data = identity.get('identity', identity)
-                contact_info = {
-                    'phone': identity_data.get('phone', ''),
-                    'email': identity_data.get('email', ''),
-                    'location': identity_data.get('address', ''),
-                    'website': identity_data.get('website', ''),
-                    'linkedin': identity_data.get('linkedin', ''),
-                    'github': identity_data.get('github', ''),
-                    'google_scholar': identity_data.get('google_scholar', '') or identity_data.get('scholar', '')
-                }
-            if title_line or contact_info:
-                header_section = self.build_header(title_line, contact_info)
+            # Check if it's new format (has target_title) or old format (has title_line)
+            if 'target_title' in header_data or 'name' in header_data:
+                # New format
+                header_section = self.build_header(header_data=header_data)
+            else:
+                # Old format - backward compatibility
+                title_line = header_data.get('title_line', '')
+                contact_info = header_data.get('contact_info', {})
+                # Fallback to identity if contact_info is empty
+                if not contact_info and identity:
+                    identity_data = identity.get('identity', identity)
+                    contact_info = {
+                        'phone': identity_data.get('phone', ''),
+                        'email': identity_data.get('email', ''),
+                        'location': identity_data.get('address', ''),
+                        'website': identity_data.get('website', ''),
+                        'linkedin': identity_data.get('linkedin', ''),
+                        'github': identity_data.get('github', ''),
+                        'google_scholar': identity_data.get('google_scholar', '') or identity_data.get('scholar', '')
+                    }
+                if title_line or contact_info:
+                    header_section = self.build_header(title_line, contact_info)
         elif identity:
             # Fallback: build header from identity if header_data not provided
             identity_data = identity.get('identity', identity)
@@ -633,13 +762,33 @@ class LaTeXBuilder:
         
         # Use template if provided, otherwise use default
         if template_path and template_path.exists():
-            template_content = template_path.read_text(encoding='utf-8')
+            # Read as bytes first to preserve backslashes, then decode
+            # This prevents Python from interpreting \n, \t, etc. as escape sequences
+            template_bytes = template_path.read_bytes()
+            template_content = template_bytes.decode('utf-8')
         else:
             template_content = self._get_default_template()
         
         # Replace markers
         latex = template_content
+        # Check if template had compact layout definition (for debugging)
+        template_had_compact = (
+            r'\newcommand{\compactresumelayout}' in template_content or
+            r'\newcommand*{\compactresumelayout}' in template_content or
+            r'\def\compactresumelayout' in template_content
+        )
+        if template_had_compact:
+            logger.debug("Template contains \\compactresumelayout definition")
         latex = latex.replace('% === AUTO:PREAMBLE ===', preamble)
+        # Verify compact layout definition is still present after marker replacement
+        if template_had_compact:
+            still_has_compact = (
+                r'\newcommand{\compactresumelayout}' in latex or
+                r'\newcommand*{\compactresumelayout}' in latex or
+                r'\def\compactresumelayout' in latex
+            )
+            if not still_has_compact:
+                logger.warning("Template had \\compactresumelayout definition but it was lost during marker replacement!")
         
         # Always insert header - either replace marker or insert before summary
         if header_section and header_section.strip():
@@ -684,9 +833,20 @@ class LaTeXBuilder:
                 latex = latex.replace('% === AUTO:ACHIEVEMENTS ===', projects_section)
             elif '% === AUTO:ADDITIONAL ===' in latex:
                 latex = latex.replace('% === AUTO:ADDITIONAL ===', projects_section)
+        else:
+            # No projects - remove empty section markers (but don't remove section headers yet)
+            # Section headers will be removed by apply_section_removals if marked for removal
+            if '% === AUTO:ACHIEVEMENTS ===' in latex:
+                latex = latex.replace('% === AUTO:ACHIEVEMENTS ===', '')
+            if '% === AUTO:ADDITIONAL ===' in latex:
+                latex = latex.replace('% === AUTO:ADDITIONAL ===', '')
         
         # Remove any remaining markers
         latex = re.sub(r'% === AUTO:\w+ ===', '', latex)
+        
+        # Apply section removals (from metadata)
+        from resume_builder.section_removal import apply_section_removals
+        latex = apply_section_removals(latex)
         
         # CRITICAL: Replace moderncv with resumecv if present
         # This handles cases where AI generates LaTeX directly or uses old templates
@@ -723,7 +883,7 @@ class LaTeXBuilder:
         # Note: Font expansion is disabled in resumecv.cls, so no need for manual fixes
         latex = self._ensure_required_packages(latex)
         
-        # Post-process to fix common LaTeX issues
+        # Post-process to fix common LaTeX issues (BEFORE compact layout injection)
         # Only assume class loads core packages if we're using resumecv (which we know loads them)
         is_resumecv = bool(re.search(r'\\documentclass[^\n]*\{resumecv\}', latex))
         latex = self._post_process_latex(latex, assume_class_loads_core_pkgs=is_resumecv)
@@ -751,8 +911,12 @@ class LaTeXBuilder:
         latex_content = re.sub(r'(?<!\\)(?<![a-zA-Z])opagenumbers\b', r'\\nopagenumbers', latex_content)
         # Fix ewcommand -> \newcommand (missing backslash)
         latex_content = re.sub(r'(?<!\\)(?<![a-zA-Z])ewcommand\b', r'\\newcommand', latex_content)
+        # Fix ewif -> \newif (missing backslash) - CRITICAL for compact layout
+        latex_content = re.sub(r'(?<!\\)(?<![a-zA-Z])ewif\b', r'\\newif', latex_content)
         # Fix oindent -> \noindent (missing backslash)
         latex_content = re.sub(r'(?<!\\)(?<![a-zA-Z])oindent\b', r'\\noindent', latex_content)
+        # Fix ame{ -> \name{ (missing backslash)
+        latex_content = re.sub(r'(?<!\\)(?<![a-zA-Z])ame\s*\{', r'\\name{', latex_content)
         
         # Fix 0.5: Fix trailing commas in documentclass options
         # Pattern: \documentclass[11pt,a4paper,]{resumecv} -> \documentclass[11pt,a4paper]{resumecv}
@@ -977,39 +1141,76 @@ class LaTeXBuilder:
         # No need to fix it here to avoid double-wrapping conflicts
         
         # Fix 4.6: Remove stray pipe characters at the start of document (common table rendering issue)
-        # Empty table cells can render as pipe characters. Remove them right after \begin{document} or \makecvtitle
-        # Pattern: \begin{document}\n| | | | or \makecvtitle\n| | | |
-        # This happens when empty table cells are rendered incorrectly
+        # CRITICAL: Remove pipe characters that appear at the top of the document
+        # This is a persistent issue where pipes appear after \begin{document} or \makecvtitle
+        # Root cause: Empty table cells, malformed LaTeX, or agent-generated content with pipes
+        
+        # First, use regex to remove pipes immediately after document start markers
         doc_start_patterns = [
+            # Patterns with newlines and whitespace variations
             (r'\\begin\{document\}\s*\n\s*\|+\s*\n', r'\\begin{document}\n'),
             (r'\\makecvtitle\s*\n\s*\|+\s*\n', r'\\makecvtitle\n'),
-            (r'\\begin\{document\}\s*\n\s*\|{4}\s*\n', r'\\begin{document}\n'),  # Exactly 4 pipes
-            (r'\\makecvtitle\s*\n\s*\|{4}\s*\n', r'\\makecvtitle\n'),  # Exactly 4 pipes
+            (r'\\begin\{document\}\s*\n\s*\|{1,}\s*\n', r'\\begin{document}\n'),  # 1 or more pipes
+            (r'\\makecvtitle\s*\n\s*\|{1,}\s*\n', r'\\makecvtitle\n'),  # 1 or more pipes
+            # Patterns with spaces between pipes (e.g., "| | | |")
+            (r'\\begin\{document\}\s*\n\s*(\|\s*){1,}\n', r'\\begin{document}\n'),
+            (r'\\makecvtitle\s*\n\s*(\|\s*){1,}\n', r'\\makecvtitle\n'),
+            # Patterns with mixed whitespace
+            (r'\\begin\{document\}\s*\n\s*\|[\s\|]*\n', r'\\begin{document}\n'),
+            (r'\\makecvtitle\s*\n\s*\|[\s\|]*\n', r'\\makecvtitle\n'),
         ]
         for pattern, replacement in doc_start_patterns:
             latex_content = re.sub(pattern, replacement, latex_content)
         
-        # Also remove pipe characters that appear on their own line right after document start
-        # This catches cases where pipes appear on separate lines
+        # Second, use line-by-line processing to catch any remaining pipe lines
+        # This is more comprehensive and handles edge cases
         lines = latex_content.split('\n')
         cleaned_lines = []
         skip_next_pipe_lines = False
+        doc_started = False
+        
         for i, line in enumerate(lines):
             # Check if this is \begin{document} or \makecvtitle
             if re.search(r'\\begin\{document\}|\\makecvtitle', line):
                 cleaned_lines.append(line)
                 skip_next_pipe_lines = True
-            # If we're in the skip zone and line is only pipes/whitespace, skip it
-            elif skip_next_pipe_lines and re.match(r'^\s*\|+\s*$', line):
-                # Skip this line (don't add it)
-                continue
-            # If we hit a non-empty, non-pipe line, stop skipping
-            elif skip_next_pipe_lines and line.strip() and not re.match(r'^\s*\|+\s*$', line):
-                skip_next_pipe_lines = False
-                cleaned_lines.append(line)
+                doc_started = True
+            # If we're in the skip zone (first 10 lines after document start) and line is only pipes/whitespace, skip it
+            elif skip_next_pipe_lines and i < len(lines) and i < 15:  # Check first 15 lines after doc start
+                # Match lines that are ONLY pipes (with optional whitespace)
+                # This catches: "|", "| |", "||||", "  |  |  ", etc.
+                if re.match(r'^\s*(\|\s*){1,}\s*$', line):
+                    # Skip this line (don't add it)
+                    logger.debug(f"Removed pipe line at position {i}: {repr(line)}")
+                    continue
+                # If we hit a non-empty, non-pipe line, stop skipping
+                elif line.strip() and not re.match(r'^\s*(\|\s*){1,}\s*$', line):
+                    skip_next_pipe_lines = False
+                    cleaned_lines.append(line)
+                else:
+                    # Empty line or whitespace - keep it
+                    cleaned_lines.append(line)
             else:
+                # Normal line processing
+                # Also remove any standalone pipe lines anywhere in the first 20 lines (safety check)
+                if doc_started and i < 20 and re.match(r'^\s*(\|\s*){1,}\s*$', line):
+                    logger.debug(f"Removed pipe line at position {i} (safety check): {repr(line)}")
+                    continue
                 cleaned_lines.append(line)
+        
         latex_content = '\n'.join(cleaned_lines)
+        
+        # Third, final cleanup pass: remove any remaining pipe-only lines in the first 25 lines
+        # This is a safety net for any edge cases we might have missed
+        lines = latex_content.split('\n')
+        final_cleaned = []
+        for i, line in enumerate(lines):
+            # Only check first 25 lines for standalone pipe lines
+            if i < 25 and re.match(r'^\s*(\|\s*){1,}\s*$', line):
+                logger.debug(f"Final cleanup: Removed pipe line at position {i}: {repr(line)}")
+                continue
+            final_cleaned.append(line)
+        latex_content = '\n'.join(final_cleaned)
         
         # Fix 5: Replace \maincolumnwidth with \linewidth in customcventry definitions
         # This fixes the narrow column issue - \maincolumnwidth is ModernCV-specific and creates skinny columns
@@ -1310,6 +1511,228 @@ def _load_json_file(file_path: Path) -> Dict[str, Any]:
         return {}
 
 
+def enforce_length_budget(
+    experiences: list,
+    projects: list,
+    skills_data: dict,
+    education_data: dict,
+    page_budget_pages: int = 2,
+) -> dict:
+    """
+    Heuristic pass to keep resume layout within the page budget.
+    Uses counts + priority, NOT actual TeX layout calculation.
+    
+    Args:
+        experiences: List of experience dicts with 'priority' and 'bullets' fields
+        projects: List of project dicts with 'priority' and 'bullets' fields
+        skills_data: Dict with 'skills' list (and optional 'groups')
+        education_data: List of education entries
+        page_budget_pages: Target page count (default: 2)
+    
+    Returns:
+        Dict with trimmed content and 'used_compact_layout' flag
+    """
+    LINES_PER_PAGE = 25  # Very conservative - actual resumes with spacing, wrapping, and formatting use fewer lines
+    
+    def estimate_lines(exp_list, proj_list, skills_dict, edu_list):
+        """Estimate total lines based on content. Accounts for text wrapping, nested lists, and spacing."""
+        total = 0
+        
+        # Header + summary: ~12-15 lines (more realistic with spacing and formatting)
+        total += 14
+        
+        # Experiences: base 6 lines + estimate based on actual text length
+        for exp in exp_list:
+            total += 6  # Title, company, dates, spacing
+            bullets = exp.get('bullets', [])
+            for bullet in bullets:
+                if isinstance(bullet, str):
+                    # Estimate lines based on text length: ~60 chars per line, account for wrapping
+                    words = len(bullet.split())
+                    # Average word length ~5 chars, so ~12 words per line, but bullets indent so ~10 words/line
+                    bullet_lines = max(1, int(words / 10) + 1)  # At least 1 line, add 1 for spacing
+                    total += bullet_lines
+                else:
+                    total += 1.5  # Fallback for non-string bullets
+        
+        # Projects: base 5 lines + estimate based on actual text length
+        for proj in proj_list:
+            total += 5  # Name, description, spacing
+            bullets = proj.get('bullets', [])
+            for bullet in bullets:
+                if isinstance(bullet, str):
+                    words = len(bullet.split())
+                    bullet_lines = max(1, int(words / 10) + 1)
+                    total += bullet_lines
+                else:
+                    total += 1.5
+        
+        # Skills: ~8 lines if <= 15 skills, else ~12 lines (accounts for wrapping)
+        skills_list = skills_dict.get('skills', [])
+        if len(skills_list) <= 15:
+            total += 8
+        else:
+            # Skills wrap to multiple lines
+            total += 12 + int((len(skills_list) - 15) / 5)  # Extra line per 5 skills
+        
+        # Education: ~5 lines per entry (accounts for spacing and formatting)
+        total += len(edu_list) * 5
+        
+        # Add section headers and spacing: ~3 lines per section (headers are taller)
+        section_count = 1  # Summary
+        if exp_list:
+            section_count += 1  # Experience
+        if proj_list:
+            section_count += 1  # Projects
+        if skills_list:
+            section_count += 1  # Skills
+        if edu_list:
+            section_count += 1  # Education
+        total += section_count * 3
+        
+        return int(total)
+    
+    trimmed_experiences = list(experiences)
+    trimmed_projects = list(projects) if projects else []
+    trimmed_skills_data = dict(skills_data)
+    
+    # Check initial estimate - if over budget, enable compact layout
+    estimated_lines = estimate_lines(trimmed_experiences, trimmed_projects, trimmed_skills_data, education_data)
+    estimated_pages = estimated_lines / LINES_PER_PAGE
+    
+    # CRITICAL: Set compact layout flag if initial estimate exceeds budget
+    # This ensures compact layout is applied even if trimming brings it under budget
+    used_compact_layout = estimated_pages > page_budget_pages
+    
+    logger.info(f"Initial length estimate: {estimated_lines} lines (~{estimated_pages:.1f} pages)")
+    if used_compact_layout:
+        logger.info(f"Content exceeds page budget ({estimated_pages:.1f} > {page_budget_pages}) - compact layout will be enabled")
+    else:
+        logger.debug(f"Content within page budget ({estimated_pages:.1f} <= {page_budget_pages}) - compact layout not needed yet")
+    
+    # While over budget, trim in priority order
+    while estimated_pages > page_budget_pages:
+        original_pages = estimated_pages
+        
+        # 1) Drop experiences with priority=2 (keep priority=1)
+        if trimmed_experiences and any(exp.get('priority', 1) == 2 for exp in trimmed_experiences):
+            for i, exp in enumerate(trimmed_experiences):
+                if exp.get('priority', 1) == 2:
+                    logger.info(f"Dropping low-priority experience '{exp.get('title', 'Unknown')}' to fit {page_budget_pages}-page budget")
+                    trimmed_experiences.pop(i)
+                    used_compact_layout = True
+                    break
+            estimated_lines = estimate_lines(trimmed_experiences, trimmed_projects, trimmed_skills_data, education_data)
+            estimated_pages = estimated_lines / LINES_PER_PAGE
+            if estimated_pages <= page_budget_pages:
+                break
+        
+        # 2) Drop projects with priority=2
+        if trimmed_projects and any(proj.get('priority', 1) == 2 for proj in trimmed_projects):
+            for i, proj in enumerate(trimmed_projects):
+                if proj.get('priority', 1) == 2:
+                    logger.info(f"Dropping low-priority project '{proj.get('name', 'Unknown')}' to fit {page_budget_pages}-page budget")
+                    trimmed_projects.pop(i)
+                    used_compact_layout = True
+                    break
+            estimated_lines = estimate_lines(trimmed_experiences, trimmed_projects, trimmed_skills_data, education_data)
+            estimated_pages = estimated_lines / LINES_PER_PAGE
+            if estimated_pages <= page_budget_pages:
+                break
+        
+        # 3) Truncate bullets to max 2 per experience/project (more aggressive for 1-2 page target)
+        for exp in trimmed_experiences:
+            bullets = exp.get('bullets', [])
+            if len(bullets) > 2:
+                logger.info(f"Truncating experience '{exp.get('title', 'Unknown')}' bullets from {len(bullets)} to 2")
+                exp['bullets'] = bullets[:2]
+                used_compact_layout = True
+        
+        for proj in trimmed_projects:
+            bullets = proj.get('bullets', [])
+            if len(bullets) > 2:
+                logger.info(f"Truncating project '{proj.get('name', 'Unknown')}' bullets from {len(bullets)} to 2")
+                proj['bullets'] = bullets[:2]
+                used_compact_layout = True
+        
+        estimated_lines = estimate_lines(trimmed_experiences, trimmed_projects, trimmed_skills_data, education_data)
+        estimated_pages = estimated_lines / LINES_PER_PAGE
+        if estimated_pages <= page_budget_pages:
+            break
+        
+        # 4) Truncate projects list beyond top 2
+        if len(trimmed_projects) > 2:
+            logger.info(f"Truncating projects list from {len(trimmed_projects)} to top 2")
+            trimmed_projects = trimmed_projects[:2]
+            used_compact_layout = True
+            estimated_lines = estimate_lines(trimmed_experiences, trimmed_projects, trimmed_skills_data, education_data)
+            estimated_pages = estimated_lines / LINES_PER_PAGE
+            if estimated_pages <= page_budget_pages:
+                break
+        
+        # 5) Truncate oldest experiences (last entries) - more aggressive for 1-2 pages
+        if len(trimmed_experiences) > 2:
+            logger.info(f"Truncating experiences list from {len(trimmed_experiences)} to top 2")
+            trimmed_experiences = trimmed_experiences[:2]
+            used_compact_layout = True
+            estimated_lines = estimate_lines(trimmed_experiences, trimmed_projects, trimmed_skills_data, education_data)
+            estimated_pages = estimated_lines / LINES_PER_PAGE
+            if estimated_pages <= page_budget_pages:
+                break
+        
+        # If no progress made, apply more aggressive trimming
+        if estimated_pages >= original_pages:
+            logger.warning(f"Standard trimming insufficient ({estimated_pages:.1f} pages), applying aggressive trimming")
+            
+            # Aggressive: Keep only top 2 experiences, 1 project, reduce all bullets to 1
+            if len(trimmed_experiences) > 2:
+                logger.info(f"Aggressively truncating experiences from {len(trimmed_experiences)} to top 2")
+                trimmed_experiences = trimmed_experiences[:2]
+                used_compact_layout = True
+            
+            if len(trimmed_projects) > 1:
+                logger.info(f"Aggressively truncating projects from {len(trimmed_projects)} to top 1")
+                trimmed_projects = trimmed_projects[:1]
+                used_compact_layout = True
+            
+            # Reduce all bullets to 1 per item
+            for exp in trimmed_experiences:
+                bullets = exp.get('bullets', [])
+                if len(bullets) > 1:
+                    logger.info(f"Aggressively reducing experience '{exp.get('title', 'Unknown')}' bullets from {len(bullets)} to 1")
+                    exp['bullets'] = bullets[:1]
+                    used_compact_layout = True
+            
+            for proj in trimmed_projects:
+                bullets = proj.get('bullets', [])
+                if len(bullets) > 1:
+                    logger.info(f"Aggressively reducing project '{proj.get('name', 'Unknown')}' bullets from {len(bullets)} to 1")
+                    proj['bullets'] = bullets[:1]
+                    used_compact_layout = True
+            
+            # Re-estimate
+            estimated_lines = estimate_lines(trimmed_experiences, trimmed_projects, trimmed_skills_data, education_data)
+            estimated_pages = estimated_lines / LINES_PER_PAGE
+            
+            # If still over budget, we've done our best - log warning but continue
+            if estimated_pages > page_budget_pages:
+                logger.warning(f"⚠️ Resume still exceeds {page_budget_pages}-page budget after aggressive trimming: {estimated_pages:.1f} pages. Consider manual editing.")
+            break
+    
+    if used_compact_layout:
+        logger.info(f"Final length estimate: {estimated_lines} lines (~{estimated_pages:.1f} pages) - compact layout enabled")
+    else:
+        logger.info(f"Final length estimate: {estimated_lines} lines (~{estimated_pages:.1f} pages) - within budget")
+    
+    return {
+        "experiences": trimmed_experiences,
+        "projects": trimmed_projects,
+        "skills": trimmed_skills_data,
+        "education": education_data,
+        "used_compact_layout": used_compact_layout
+    }
+
+
 def build_resume_from_json_files(
     identity_path: Path,
     summary_path: Path,
@@ -1319,7 +1742,8 @@ def build_resume_from_json_files(
     projects_path: Optional[Path] = None,
     header_path: Optional[Path] = None,
     template_path: Optional[Path] = None,
-    output_path: Optional[Path] = None
+    output_path: Optional[Path] = None,
+    page_budget_pages: int = 2
 ) -> str:
     """
     Convenience function to build resume from JSON files.
@@ -1349,8 +1773,24 @@ def build_resume_from_json_files(
         load_education_block, load_selected_projects, load_header_block
     )
     
-    summary_data = load_summary_block(summary_path)
-    summary = summary_data.get('summary', '')
+    # Check for refined summary first, fallback to regular summary
+    summary_refined_path = summary_path.parent / "summary_refined.json"
+    if summary_refined_path.exists():
+        try:
+            summary_refined_data = load_summary_block(summary_refined_path)
+            if summary_refined_data.get('status') == 'success' and summary_refined_data.get('refined_summary'):
+                logger.info("Using refined summary from summary_refined.json")
+                summary = summary_refined_data.get('refined_summary', '')
+            else:
+                summary_data = load_summary_block(summary_path)
+                summary = summary_data.get('summary', '')
+        except Exception as e:
+            logger.warning(f"Failed to load refined summary, using regular: {e}")
+            summary_data = load_summary_block(summary_path)
+            summary = summary_data.get('summary', '')
+    else:
+        summary_data = load_summary_block(summary_path)
+        summary = summary_data.get('summary', '')
     
     exp_data = load_selected_experiences(experience_path)
     experiences = exp_data.get('selected_experiences', [])
@@ -1358,8 +1798,13 @@ def build_resume_from_json_files(
     edu_data = load_education_block(education_path)
     education = edu_data.get('education', [])
     
-    skills_data = load_selected_skills(skills_path)
-    skills = skills_data.get('selected_skills', [])
+    skills_json_data = load_selected_skills(skills_path)
+    # New format: skills_json_data has 'skills' and optional 'groups'
+    # Pass the entire dict to build_complete_resume which will handle it
+    skills_data = {
+        'skills': skills_json_data.get('skills', skills_json_data.get('selected_skills', [])),
+        'groups': skills_json_data.get('groups')
+    }
     
     projects = None
     if projects_path and projects_path.exists():
@@ -1369,22 +1814,155 @@ def build_resume_from_json_files(
     header_data = None
     if header_path and header_path.exists():
         header_json_data = load_header_block(header_path)
-        header_data = {
-            'title_line': header_json_data.get('title_line', ''),
-            'contact_info': header_json_data.get('contact_info', {})
-        }
+        # load_header_block already converts old format to new format
+        # Pass it directly - build_complete_resume will handle both formats
+        header_data = header_json_data
     
-    # Build resume
+    # Enforce length budget before building LaTeX
+    condensed = enforce_length_budget(
+        experiences=experiences,
+        projects=projects or [],
+        skills_data=skills_data,
+        education_data=education,
+        page_budget_pages=page_budget_pages
+    )
+    
+    # Build resume with condensed content
     latex = builder.build_complete_resume(
         identity=identity,
         summary=summary,
-        experiences=experiences,
-        education=education,
-        skills=skills,
-        projects=projects,
+        experiences=condensed["experiences"],
+        education=condensed["education"],
+        skills=condensed["skills"],  # Pass as dict with 'skills' and 'groups'
+        projects=condensed["projects"] if condensed["projects"] else None,
         header_data=header_data,
         template_path=template_path
     )
+    
+    # Apply compact layout if needed
+    # Also check final estimate - if still over budget, force compact layout
+    from resume_builder.length_budget import estimate_lines as estimate_lines_global, TARGET_LINES_PER_PAGE
+    
+    # Get skills list (handle both dict and list formats)
+    skills_list = condensed["skills"]
+    if isinstance(skills_list, dict):
+        skills_list = skills_list.get('skills', skills_list.get('selected_skills', []))
+    
+    final_estimated_lines = estimate_lines_global(
+        summary,  # Use the summary that was passed in
+        condensed["experiences"],
+        condensed["projects"] or [],
+        skills_list,
+        condensed["education"]
+    )
+    final_estimated_pages = final_estimated_lines / TARGET_LINES_PER_PAGE
+    
+    # Force compact layout if final estimate still exceeds budget
+    if not condensed["used_compact_layout"] and final_estimated_pages > page_budget_pages:
+        logger.warning(f"Final estimate ({final_estimated_pages:.1f} pages) exceeds budget ({page_budget_pages}) - forcing compact layout")
+        condensed["used_compact_layout"] = True
+    elif condensed["used_compact_layout"]:
+        logger.info(f"Compact layout already enabled (final estimate: {final_estimated_pages:.1f} pages)")
+    else:
+        logger.debug(f"Final estimate ({final_estimated_pages:.1f} pages) within budget - compact layout not needed")
+    
+    if condensed["used_compact_layout"]:
+        logger.info("Compact layout is enabled - ensuring \\compactresumelayout is defined and called")
+        # Always ensure \compactresumelayout is defined and called
+        # Check if \compactresumelayout is already defined in the template
+        # Also check for corrupted versions (missing backslashes)
+        has_compact_command = (
+            r'\newcommand{\compactresumelayout}' in latex or
+            r'\newcommand*{\compactresumelayout}' in latex or
+            r'\def\compactresumelayout' in latex
+        )
+        logger.debug(f"Compact command check: has_compact_command={has_compact_command}, latex length={len(latex)}")
+        
+        # Check for corrupted version and fix it
+        if r'ewcommand{\compactresumelayout}' in latex or r'ewif\ifcompactresume' in latex:
+            logger.warning("Detected corrupted compact layout definition (missing backslashes), fixing...")
+            # Fix corrupted definitions
+            latex = re.sub(r'ewif\s*\\ifcompactresume', r'\\newif\\ifcompactresume', latex)
+            latex = re.sub(r'ewcommand\{\\compactresumelayout\}', r'\\newcommand{\\compactresumelayout}', latex)
+            has_compact_command = True  # Mark as fixed
+        
+        # CRITICAL: Always inject the definition if not present (even if template had it, it might have been lost)
+        # This ensures the definition is always present when compact layout is enabled
+        if not has_compact_command:
+            # Find the preamble end (before \begin{document})
+            if r'\begin{document}' in latex:
+                doc_start = latex.find(r'\begin{document}')
+                preamble = latex[:doc_start]
+                document_body = latex[doc_start:]
+                
+                # Check if enumitem is loaded (required for \setlist)
+                has_enumitem = r'\usepackage{enumitem}' in latex or r'\usepackage[enumitem]' in latex
+                
+                # Inject compact layout definition before \begin{document}
+                # Use explicit backslashes to ensure they're preserved
+                compact_definition = "\n% Compact layout toggle for page budget enforcement (auto-injected)\n"
+                compact_definition += "\\newif\\ifcompactresume\n"
+                compact_definition += "\\compactresumefalse\n"
+                
+                # Add enumitem if not present (required for \setlist)
+                if not has_enumitem:
+                    compact_definition += "\\usepackage{enumitem}\n"
+                
+                compact_definition += "\n"
+                compact_definition += "\\newcommand{\\compactresumelayout}{%\n"
+                compact_definition += "  \\compactresumetrue\n"
+                compact_definition += "  \\setlength{\\itemsep}{0.2em}\n"
+                compact_definition += "  \\setlength{\\parskip}{0.15em}\n"
+                compact_definition += "  \\setlist[itemize]{leftmargin=*, labelsep=0.4em, topsep=0.1em, itemsep=0.1em, parsep=0em}\n"
+                compact_definition += "  \\setlist[enumerate]{leftmargin=*, labelsep=0.4em, topsep=0.1em, itemsep=0.1em, parsep=0em}\n"
+                compact_definition += "}\n"
+                latex = preamble + compact_definition + document_body
+                logger.info("Auto-injected \\compactresumelayout definition into template")
+            else:
+                logger.warning("Could not find \\begin{document} to inject compact layout definition")
+        else:
+            logger.debug("\\compactresumelayout command already defined in template")
+        
+        # Always inject compact layout toggle call (even if command is already defined)
+        # Check if it's already called (look for the call in document body, not the definition in preamble)
+        doc_start_pos = latex.find(r'\begin{document}')
+        if doc_start_pos > 0:
+            document_body = latex[doc_start_pos:]
+            # Check if \compactresumelayout appears in document body (not as part of \newcommand)
+            compact_pos = document_body.find(r'\compactresumelayout')
+            if compact_pos >= 0:
+                # Check if it's part of a \newcommand definition (look backwards)
+                context_before = document_body[max(0, compact_pos-30):compact_pos]
+                has_compact_call = r'\newcommand' not in context_before and r'\newcommand*' not in context_before
+            else:
+                has_compact_call = False
+        else:
+            has_compact_call = False
+        
+        if not has_compact_call:
+            # Inject compact layout toggle after \begin{document}
+            if r'\begin{document}' in latex:
+                latex = latex.replace(
+                    r'\begin{document}',
+                    r'\begin{document}' + '\n\\compactresumelayout',
+                    1  # Only replace first occurrence
+                )
+                logger.info("Auto-injected \\compactresumelayout call after \\begin{document}")
+            # Fallback: inject before \makecvtitle if \begin{document} not found
+            elif r'\makecvtitle' in latex:
+                latex = latex.replace(
+                    r'\makecvtitle',
+                    r'\\compactresumelayout' + '\n\\makecvtitle',
+                    1  # Only replace first occurrence
+                )
+                logger.info("Auto-injected \\compactresumelayout call before \\makecvtitle")
+        else:
+            logger.debug("\\compactresumelayout call already present in LaTeX")
+        
+        # Post-process again AFTER compact layout injection to fix any backslashes that got corrupted
+        # This is a safety net in case the injection or template reading corrupted backslashes
+        is_resumecv = bool(re.search(r'\\documentclass[^\n]*\{resumecv\}', latex))
+        latex = builder._post_process_latex(latex, assume_class_loads_core_pkgs=is_resumecv)
     
     # Write to file if output path provided
     if output_path:
@@ -1393,6 +1971,62 @@ def build_resume_from_json_files(
         output_path.write_text(latex, encoding='utf-8')
     
     return latex
+
+
+def rebuild_resume_from_existing_json(
+    output_dir: Optional[Path] = None,
+    template_path: Optional[Path] = None,
+    rendered_tex_path: Optional[Path] = None,
+) -> Path:
+    """
+    Rebuild the LaTeX resume from existing JSON files without rerunning Crew.
+    
+    This is used after JSON edits (manual or LLM-based).
+    
+    Args:
+        output_dir: Directory containing JSON files (defaults to OUTPUT_DIR)
+        template_path: Optional custom LaTeX template path
+        rendered_tex_path: Output path for rendered .tex file (defaults to output/generated/rendered_resume.tex)
+        
+    Returns:
+        Path to the generated LaTeX file
+    """
+    from resume_builder.paths import OUTPUT_DIR, GENERATED_DIR, TEMPLATES
+    
+    if output_dir is None:
+        output_dir = OUTPUT_DIR
+    
+    if rendered_tex_path is None:
+        rendered_tex_path = GENERATED_DIR / "rendered_resume.tex"
+    
+    if template_path is None:
+        template_path = TEMPLATES / "main.tex"
+    
+    # Standard JSON file paths
+    identity_path = output_dir / "user_profile.json"
+    summary_path = output_dir / "summary.json"
+    experience_path = output_dir / "selected_experiences.json"
+    education_path = output_dir / "education.json"
+    skills_path = output_dir / "selected_skills.json"
+    projects_path = output_dir / "selected_projects.json"  # Optional
+    header_path = output_dir / "header.json"  # Optional
+    
+    # Call existing builder
+    build_resume_from_json_files(
+        identity_path=identity_path,
+        summary_path=summary_path,
+        experience_path=experience_path,
+        education_path=education_path,
+        skills_path=skills_path,
+        projects_path=projects_path if projects_path.exists() else None,
+        header_path=header_path if header_path.exists() else None,
+        template_path=template_path if template_path.exists() else None,
+        output_path=rendered_tex_path,
+        page_budget_pages=2
+    )
+    
+    logger.info(f"Rebuilt resume LaTeX from existing JSON files: {rendered_tex_path}")
+    return rendered_tex_path
 
 
 def repair_latex_file(tex_content: str, *, force: bool = False) -> str:

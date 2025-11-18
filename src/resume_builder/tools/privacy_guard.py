@@ -47,24 +47,21 @@ class PrivacyGuardTool(BaseTool):
         
         # Email patterns
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        info['emails'] = re.findall(email_pattern, text)
+        info['emails'] = list(set(re.findall(email_pattern, text)))  # Deduplicate
         
         # Phone patterns (various formats)
         phone_patterns = [
             r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',  # US format
             r'\b\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b',  # International
         ]
+        phones = []
         for pattern in phone_patterns:
-            info['phones'].extend(re.findall(pattern, text))
+            phones.extend(re.findall(pattern, text))
+        info['phones'] = list(set(phones))  # Deduplicate
         
         # Address patterns (street addresses, cities, states)
         address_pattern = r'\d+\s+[A-Za-z0-9\s,]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Circle|Cir)[\s,]*[A-Za-z\s,]+(?:[A-Z]{2})?\s+\d{5}'
         info['addresses'] = re.findall(address_pattern, text, re.IGNORECASE)
-        
-        # Company names (common patterns)
-        company_patterns = [
-            r'\b(?:Inc|LLC|Ltd|Corp|Corporation|Company|Co\.)\b',
-        ]
         
         return info
 
@@ -81,11 +78,14 @@ class PrivacyGuardTool(BaseTool):
                 'email': profile.get('email', ''),
                 'phone': profile.get('phone', ''),
                 'address': profile.get('address', ''),
-                'companies': [exp.get('company', '') for exp in profile.get('experience', [])],
+                'companies': [exp.get('company', '') for exp in profile.get('experience', []) if exp.get('company')],
                 'skills': profile.get('skills', []),
-                'education': [edu.get('institution', '') for edu in profile.get('education', [])],
+                'education': [edu.get('institution', '') for edu in profile.get('education', []) if edu.get('institution')],
             }
-        except Exception:
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            # Log but don't fail - return empty dict
+            import logging
+            logging.getLogger("privacy_guard").debug(f"Failed to extract profile info: {e}")
             return {}
 
     @staticmethod

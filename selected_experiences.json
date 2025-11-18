@@ -1,0 +1,14 @@
+{
+  "experiences": [
+    {
+      "title": "Graduate Researcher",
+      "company": "CARL Lab",
+      "description": "Developed multi-robot softwar simulation in ROS2, utilizing Python for scripting and automation, optimizing testing frameworks for CI/CD pipelines."
+    },
+    {
+      "title": "Assistant",
+      "company": "NMI Lab",
+      "description": "Contributed to the design of a power-efficient spiking neural network, implementing automated testing protocols and mentoring junior developers in software methodologies."
+    }
+  ]
+}

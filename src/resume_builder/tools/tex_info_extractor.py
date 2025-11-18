@@ -268,10 +268,11 @@ class TexInfoExtractorTool(BaseTool):
                 "last": name_info.get("last", ""),
                 "email": email,
                 "phone": phone,
+                "location": address,  # Map address to location for consistency
                 "website": urls.get("website", ""),
                 "linkedin": urls.get("linkedin", ""),
                 "github": urls.get("github", ""),
-                "address": address,
+                "address": address,  # Keep for backward compatibility
             },
             "other_urls": urls.get("other_urls", []),
             "source": "tex_file"

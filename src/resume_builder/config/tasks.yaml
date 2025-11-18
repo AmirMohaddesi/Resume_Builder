@@ -1,388 +1,386 @@
-# Simplified task configuration - Agents output JSON, Python handles LaTeX
-# NO MORE LATEX IN AGENT TASKS!
-#
-# ARCHIVED TASKS: See tasks_archived.yaml for tasks replaced by deterministic Python functions
-# or not currently wired into the runtime pipeline.
+# tasks.yaml
+# Global rules (implicit for all tasks):
+# - Call tools exactly as described; do NOT invent file paths.
+# - write_json_file must receive a raw JSON string (no ``` fences).
+# - Output is JSON only; no LaTeX or markdown.
 
-# ============================================
-# PHASE 1: INPUT PROCESSING (1 task)
-# ============================================
+# =========================
+# PHASE 1: INPUT PROCESSING
+# =========================
 
 parse_job_description_task:
   description: >
-    Parse the job description text provided in the task context.
-    NOTE: {job_description} is a template variable that will be replaced with the actual job description text from the pipeline inputs.
-    
-    Step-by-Step Instructions:
-    1. Parse the job description text: {job_description}
-    2. Extract structured information:
-       - title: Job title/role
-       - company: Company name (if mentioned)
-       - location: Job location (if mentioned, optional)
-       - skills: List of technical skills mentioned
-       - keywords: List of important keywords/phrases
-       - cleaned_text: Full JD text cleaned of formatting
-    3. Write JSON: Use write_json_file to write output/parsed_jd.json
-    
-    Schema: {status: "success"|"error", message: string, title?: string, company?: string, location?: string, skills: array, keywords: array, cleaned_text: string}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
-    - If extraction fails, set status="error" and provide error message in message field.
+    Input: {job_description} (raw text).
+    Goal: Save output/parsed_jd.json with key JD fields.
+    Extract:
+      - title, company, location? (strings)
+      - skills[], keywords[] (arrays)
+      - cleaned_text (string)
+      - optional: seniority ("Senior", "Staff"), focus_area ("Perception", etc.)
+    On failure: set status="error" and a clear message.
+    Use write_json_file("output/parsed_jd.json", json_str).
   expected_output: >
-    JSON with status, message, title, company, skills, keywords, and cleaned_text (NO markdown, NO extra fields)
+    JSON in output/parsed_jd.json:
+    {status, message, title?, company?, location?, seniority?,
+     focus_area?, skills[], keywords[], cleaned_text}.
   agent: jd_analyst
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
 
-# ============================================
-# PHASE 2: CONTENT SELECTION (3 focused tasks)
-# ============================================
+# =========================
+# PHASE 2: SELECTION (LENGTH-AWARE)
+# =========================
 
 select_experiences_task:
   description: >
-    Context: Read profile_reader("output/user_profile.json") and read_json_file("output/parsed_jd.json")
-    
-    Step-by-Step Instructions:
-    1. Read profile: Use profile_reader("output/user_profile.json") to get candidate profile
-    2. Read JD: Use read_json_file("output/parsed_jd.json") to get job description keywords
-    3. Select experiences: Choose top 3-5 experiences from profile that match JD keywords
-    4. Write JSON: Use write_json_file to write output/selected_experiences.json
-    
-    Schema: {status: "success", message: string, selected_experiences: [{organization: string, title: string, location?: string, dates: string, description: string}]}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
-    - No reasoning. Strict JSON only. No markdown. No commentary.
+    Inputs:
+      - profile_reader("output/user_profile.json")
+      - read_json_file("output/parsed_jd.json")
+    Goal: Choose a small, JD-aligned subset of experiences.
+    Actions:
+      - FIRST: Call design_error_checker(context="experience") to check for known design errors that users have reported.
+      - Review the prevention guidance from design_error_checker and follow it carefully.
+      - Length budget (for 1–2 pages):
+        * Max 4 experiences.
+        * Each: max 3–4 bullets, ~25 words per bullet.
+      - Score all experiences vs JD title, focus_area, skills.
+      - Pick top 3–4; assign priority (1=must keep, 2=nice to have).
+      - Rewrite bullets to be concise, impact-focused, and not duplicates.
+      - Save to output/selected_experiences.json.
   expected_output: >
-    JSON with selected experiences (plain text, NO LaTeX, NO markdown) - no other text
+    JSON in output/selected_experiences.json:
+    {status, message, selected_experiences: [
+      {id, title, company, location?, dates?, priority,
+       bullets: [string, ...]}
+    ]}.
   agent: experience_selector
   context:
     - parse_job_description_task
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
 
 select_projects_task:
   description: >
-    Context: Read profile_reader("output/user_profile.json") and read_json_file("output/parsed_jd.json")
-    
-    Step-by-Step Instructions:
-    1. Read profile: Use profile_reader("output/user_profile.json") to get candidate profile
-    2. Read JD: Use read_json_file("output/parsed_jd.json") to get job description keywords
-    3. Select projects: Choose 2-4 projects from profile that match JD keywords
-    4. Write JSON: Use write_json_file to write output/selected_projects.json
-    
-    Schema: {status: "success", message: string, selected_projects: [{name: string, description: string, url?: string}]}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
-    - No reasoning. Strict JSON only. No markdown. No commentary.
+    Inputs:
+      - profile_reader("output/user_profile.json")
+      - read_json_file("output/parsed_jd.json")
+    Goal: Choose 2–3 JD-aligned projects with intelligently summarized bullet points.
+    Actions:
+      - FIRST: Call design_error_checker(context="projects") to check for known design errors that users have reported.
+      - Review the prevention guidance from design_error_checker and follow it carefully.
+      - Length budget (for 1–2 page resume):
+        * Max 3 projects, each with 2–3 bullets.
+        * Each bullet: max ~20–25 words, impact-focused.
+      - Select 2–3 most relevant projects aligned with JD skills/keywords.
+      - For each project, use project_summarizer tool to intelligently summarize bullet points:
+        * Call project_summarizer with bullets and JD keywords from parsed_jd.json
+        * Tool will condense long bullets, merge redundant points, and prioritize JD-relevant content
+        * Use the summarized_bullets from tool output
+      - Each bullet should be concise, action-oriented, and highlight impact.
+      - Add priority (1=must keep, 2=nice to have).
+      - Save to output/selected_projects.json.
   expected_output: >
-    JSON with selected projects (plain text, NO LaTeX, NO markdown) - no other text
+    JSON in output/selected_projects.json:
+    {status, message, selected_projects: [
+      {name, role?, priority, url?, bullets: [string, ...]}
+    ]}.
   agent: project_selector
   context:
     - parse_job_description_task
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
 
 select_skills_task:
   description: >
-    Context: Read profile_reader("output/user_profile.json") and read_json_file("output/parsed_jd.json")
-    
-    Step-by-Step Instructions:
-    1. Read profile: Use profile_reader("output/user_profile.json") to get candidate profile
-    2. Read JD: Use read_json_file("output/parsed_jd.json") to get job description keywords
-    3. Select skills: Choose 8-12 skills from profile that match JD keywords
-    4. Write JSON: Use write_json_file to write output/selected_skills.json
-    
-    Schema: {status: "success", message: string, selected_skills: [string, ...]}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
-    - No reasoning. Strict JSON only. No markdown. No commentary.
+    Inputs:
+      - profile_reader("output/user_profile.json")
+      - read_json_file("output/parsed_jd.json")
+    Goal: Build a compact, JD-aligned skills list.
+    Actions:
+      - FIRST: Call design_error_checker(context="skills") to check for known design errors that users have reported.
+      - Review the prevention guidance from design_error_checker and follow it carefully.
+      - Length budget: 10–20 skills total.
+      - Start from profile skills.
+      - Emphasize overlap with JD skills/keywords.
+      - De-duplicate and optionally group (Languages, Frameworks, Tools).
+      - Save to output/selected_skills.json.
   expected_output: >
-    JSON with selected skills as simple string array (NO LaTeX, NO markdown) - no other text
+    JSON in output/selected_skills.json:
+    {status, message,
+     skills: [string, ...],
+     groups?: {name: [skills]}}.
   agent: skill_selector
   context:
     - parse_job_description_task
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
 
-# ============================================
-# PHASE 3: CONTENT WRITING (3 focused tasks)
-# ============================================
+# =========================
+# PHASE 3: CORE CONTENT
+# =========================
 
 write_header_task:
   description: >
-    Context: Read read_json_file("output/parsed_jd.json"), read_json_file("output/selected_skills.json"), profile_reader("output/user_profile.json")
-    
-    Step-by-Step Instructions:
-    1. Read JD: Use read_json_file("output/parsed_jd.json") to get job description keywords
-    2. Read skills: Use read_json_file("output/selected_skills.json") to get selected skills
-    3. Read profile: Use profile_reader("output/user_profile.json") to get candidate profile
-    4. Extract contact info: phone, email, location (from identity.address or experience/education), website, linkedin/github (username only), google_scholar (full URL)
-    5. Generate title line: 3-5 JD keywords separated by | (e.g., "AI/ML Engineer | Robotics | PyTorch")
-    6. Write JSON: Use write_json_file to write output/header_block.json
-    
-    Schema: {status: "success", message: string, title_line: string, contact_info: {phone?: string, email?: string, location?: string, website?: string, linkedin?: string, github?: string, google_scholar?: string}}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
-    - DO NOT invent contact information - only use what exists in the profile.
+    Inputs:
+      - profile_reader("output/user_profile.json")
+      - read_json_file("output/selected_skills.json")
+      - read_json_file("output/selected_experiences.json")
+      - read_json_file("output/parsed_jd.json")
+    Goal: Create header + target_title.
+    Actions:
+      - FIRST: Call design_error_checker(context="header") to check for known design errors that users have reported.
+      - Review the prevention guidance from design_error_checker and follow it carefully.
+      - Use only real contact info from profile (no invented data).
+      - Extract from profile.identity: email, phone, location, website, linkedin, github.
+      - location should be extracted from profile.identity.location if present.
+      - target_title should reflect JD title/seniority (e.g., "Senior Software Engineer").
+      - target_title is metadata only and will NOT be displayed in the PDF header.
+      - Do NOT use pipe characters (|) in target_title - it should be a simple job title string.
+      - CRITICAL: If creating a title_line for display, use AT MOST 2-3 pipe separators (|). Avoid excessive separators like "||||" which create visual clutter. Use pipes sparingly for visual clarity.
+    Save to output/header.json.
   expected_output: >
-    JSON with tailored title line and contact information (NO markdown, NO extra fields)
+    JSON in output/header.json:
+    {status, message, name, location?, email, phone?,
+     links?: [string], target_title}.
   agent: header_writer
   context:
     - select_skills_task
     - select_experiences_task
     - parse_job_description_task
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
-  # NOTE: Can read education from profile.identity.education, doesn't need write_education_section_task
 
 write_summary_task:
   description: >
-    Context: Read read_json_file("output/selected_experiences.json"), read_json_file("output/selected_skills.json"), read_json_file("output/parsed_jd.json")
-    
-    Step-by-Step Instructions:
-    1. Read experiences: Use read_json_file("output/selected_experiences.json") to get selected experiences
-    2. Read skills: Use read_json_file("output/selected_skills.json") to get selected skills
-    3. Read JD: Use read_json_file("output/parsed_jd.json") to get job description context
-    4. Write 2-3 sentence professional summary using this structure:
-       - First sentence: Years of experience + primary expertise area
-       - Second sentence: Key achievements/impact from selected experiences
-       - Optional third sentence: Relevant skills or specialization
-    5. Use active voice, quantify achievements when possible. Plain text only - NO LaTeX, NO markdown.
-    6. Write JSON: Use write_json_file to write output/summary_block.json
-    
-    Schema: {status: "success", message: string, summary: string}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
-    - DO NOT invent achievements or experience - only use what's in selected_experiences.json.
+    Inputs:
+      - read_json_file("output/selected_experiences.json")
+      - read_json_file("output/selected_skills.json")
+      - read_json_file("output/parsed_jd.json")
+    Goal: Write a short JD-aligned summary from scratch.
+    Actions:
+      - FIRST: Call design_error_checker(context="summary") to check for known design errors that users have reported.
+      - Review the prevention guidance from design_error_checker and follow it carefully.
+      - Length budget: 2–3 sentences, ≤ ~90 words.
+      - State years of experience + main area.
+      - Highlight 2–3 strengths that match JD.
+      - Include a few JD keywords naturally.
+      - Do NOT call summary_editor tool - you are creating, not refining.
+      - Save to output/summary.json.
   expected_output: >
-    JSON with summary as plain text (NO LaTeX, NO markdown, NO extra fields)
-  agent: summary_writer
+    JSON in output/summary.json:
+    {status, message, summary: string, approx_word_count: number}.
+  agent: summary_creator
   context:
     - select_experiences_task
     - select_skills_task
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
 
 write_education_section_task:
   description: >
-    Context: Read profile_reader("output/user_profile.json")
-    
-    Step-by-Step Instructions:
-    1. Read profile: Use profile_reader("output/user_profile.json") to get candidate profile
-    2. Extract education: Get identity.education array from the profile
-    3. For each education entry, extract: degree, institution, location (optional), dates, gpa (optional), honors (optional)
-    4. Write JSON: Use write_json_file to write output/education_block.json
-    5. If education array is empty or missing, return empty array: education: []
-    
-    Schema: {status: "success", message: string, education: [{degree: string, institution: string, location?: string, dates: string, gpa?: string, honors?: string}]}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
+    Input:
+      - profile_reader("output/user_profile.json")
+    Goal: Produce a compact education section.
+    Actions:
+      - FIRST: Call design_error_checker(context="education") to check for known design errors that users have reported.
+      - Review the prevention guidance from design_error_checker and follow it carefully.
+      - Length budget: Max 3 entries; each line-efficient.
+      - Choose highest-value degrees (most recent / most relevant).
+      - For each: degree, institution, location?, dates?, honors?.
+      - Save to output/education.json.
   expected_output: >
-    JSON with education entries as plain text (NO LaTeX, NO markdown, NO extra fields)
+    JSON in output/education.json:
+    {status, message, education: [
+      {degree, institution, location?, dates?, honors?}
+    ]}.
   agent: education_writer
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
 
-# ============================================
-# PHASE 4: QUALITY & COVER LETTER (3 tasks)
-# ============================================
+# =========================
+# PHASE 4: QUALITY CHECKS
+# =========================
 
 ats_check_task:
   description: >
-    Context: Read read_json_file("output/parsed_jd.json"), read_json_file("output/selected_experiences.json"), read_json_file("output/selected_skills.json")
-    
-    Step-by-Step Instructions:
-    1. Read JD: Use read_json_file("output/parsed_jd.json") to get job description keywords
-       - If file is missing: set status="degraded", error_type="missing_jd"
-    2. Read experiences: Use read_json_file("output/selected_experiences.json") to get selected experiences
-    3. Read skills: Use read_json_file("output/selected_skills.json") to get selected skills
-    4. Analyze keyword coverage:
-       - Identify present keywords (keywords from JD found in resume content)
-       - Identify missing keywords (keywords from JD not found in resume)
-       - Calculate coverage_score (0.0-1.0): ratio of present keywords to total keywords
-       - Generate recommendations for improving ATS compatibility
-    5. Write JSON: Use write_json_file to write output/ats_report.json
-    
-    Schema: {status: "success"|"degraded"|"error", message: string, coverage_score: number, present_keywords: array, missing_keywords: array, recommendations: array, error_type?: string, hint?: string}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
+    Inputs:
+      - profile_reader("output/user_profile.json")
+      - read_json_file("output/parsed_jd.json")
+      - read_json_file("output/selected_experiences.json")
+      - read_json_file("output/selected_skills.json")
+      - read_json_file("output/summary.json")
+    Goal: Generate an ATS/readability report.
+    Actions:
+      - Score JD keyword coverage and skill match.
+      - Identify issues and short, actionable suggestions.
+      - Save to output/ats_report.json.
   expected_output: >
-    ATS compatibility report JSON with standardized status/message fields (NO markdown, NO extra fields)
+    JSON in output/ats_report.json:
+    {status, message, keyword_coverage: number,
+     match_score: number, issues: [string], suggestions: [string]}.
   agent: ats_checker
   context:
     - select_experiences_task
     - select_skills_task
     - write_summary_task
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
 
 privacy_validation_task:
   description: >
-    Context: Use privacy_guard_tool(content_path="output/user_profile.json", profile_path="output/user_profile.json", content_type="json", job_description="{job_description}")
-    NOTE: {job_description} is a template variable that will be replaced with the actual job description text from the pipeline inputs.
-    
-    Instructions:
-    1. Call privacy_guard_tool with the parameters above
-    2. Check profile for sensitive data: SSN, passport numbers, private addresses, credit card numbers
-    3. Report findings: validation_status ("passed"|"failed"|"warning"), list any issues found
-    4. Write to output/privacy_validation_report.json using write_json_file
-    
-    Schema: {status: "success"|"error", message: string, validation_status: "passed"|"failed"|"warning", issues: array, error_type?: string, hint?: string}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
+    Inputs:
+      - read_json_file("output/selected_experiences.json")
+      - read_json_file("output/selected_projects.json")
+      - read_json_file("output/summary.json")
+      - profile_reader("output/user_profile.json")
+    Goal: Flag privacy / sensitive-data issues and validate factuality.
+    Actions:
+      - Use content_validator tool with resume JSON data and profile JSON.
+      - Tool checks for factuality, hallucinations, and privacy risks.
+      - Also run privacy_guard_tool for additional scanning.
+      - Summarize findings into output/privacy_report.json.
   expected_output: >
-    Privacy validation report JSON with standardized status/message fields (NO markdown, NO extra fields)
+    JSON in output/privacy_report.json:
+    {status, message, issues: [string], high_risk: [string], factuality_check: object}.
   agent: privacy_guard
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
+
+# =========================
+# PHASE 5: COVER LETTER
+# =========================
 
 write_cover_letter_task:
   description: >
-    Context: Read read_json_file("output/user_profile.json"), read_json_file("output/parsed_jd.json"), read_json_file("output/selected_experiences.json"), read_json_file("output/selected_skills.json"), read_json_file("output/selected_projects.json")
-    
-    Instructions:
-    1. Generate tailored cover letter (≤400 words) using this structure:
-       - Opening (2-3 sentences): Express interest, mention role, highlight 1-2 key qualifications
-       - Body (2-3 paragraphs): Match 2-3 experiences/projects to JD requirements, use specific examples
-       - Closing (1-2 sentences): Reiterate interest, call to action
-    2. Use keywords from JD naturally
-    3. NEVER invent information - only use what's in user_profile.json
-    4. If JD missing: set red_flags=["missing_jd"], produce generic but truthful letter
-    5. Ensure total word count ≤ 400 words
-    
-    Output: Write to output/cover_letter.json using write_json_file with EXACT schema:
-    {ok: boolean, status: "success"|"error", message: string, cover_letter_md: string, keywords_used: array, skills_alignment: array, red_flags: array, meta: {word_count: number, jd_available: boolean}, error_type: string|null, hint: string|null}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - Field MUST be "cover_letter_md" (not "cover_letter"). Use write_json_file tool.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
+    Inputs:
+      - read_json_file("output/parsed_jd.json")
+      - read_json_file("output/selected_experiences.json")
+      - read_json_file("output/selected_skills.json")
+      - read_json_file("output/selected_projects.json")
+    Goal: Create a tailored cover letter JSON from scratch.
+    Length budget:
+      - 250–400 words, strictly ≤ 400.
+    Actions:
+      - Write 3–5 paragraphs (intro, 2–3 body, closing).
+      - Focus on JD alignment using selected experiences/skills/projects.
+      - Include key JD terms naturally.
+      - Do NOT call cover_letter_editor tool - you are creating, not refining.
+      - Save to output/cover_letter.json.
   expected_output: >
-    Cover letter JSON with status, message, cover_letter_md, keywords, alignment, and meta (NO markdown, NO extra fields)
-  agent: coverletter_generator
+    JSON in output/cover_letter.json:
+    {status, message, cover_letter_md: string,
+     word_count: number, keywords_used: [string],
+     skills_alignment: [string], red_flags: [string]}.
+  agent: cover_letter_creator
   context:
     - parse_job_description_task
     - select_experiences_task
     - select_skills_task
     - select_projects_task
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
 
-# ============================================
-# PHASE 5: TEMPLATE MATCHING (optional task)
-# ============================================
+# =========================
+# PHASE 6: REFINEMENT TASKS (LLM-Powered)
+# =========================
+
+refine_summary_task:
+  description: >
+    Inputs:
+      - read_json_file("output/summary.json")
+      - read_json_file("output/parsed_jd.json")
+    Goal: Refine and shorten summary using LLM-powered summary_editor tool.
+    Actions:
+      - Read current summary from summary.json.
+      - Extract JD keywords from parsed_jd.json.
+      - Call summary_editor tool with summary text and JD keywords.
+      - Tool will create crisp 1-2 sentence summary (≤90 words).
+      - Use the refined_summary from tool output.
+      - Save refined summary to output/summary_refined.json.
+  expected_output: >
+    JSON in output/summary_refined.json:
+    {status, message, refined_summary: string, word_count: number, sentence_count: number}.
+  agent: summary_refiner
+  context:
+    - write_summary_task
+
+refine_cover_letter_task:
+  description: >
+    Inputs:
+      - read_json_file("output/cover_letter.json")
+      - read_json_file("output/parsed_jd.json")
+    Goal: Refine and shorten cover letter using LLM-powered cover_letter_editor tool.
+    Actions:
+      - Read current cover letter from cover_letter.json.
+      - Extract JD text from parsed_jd.json.
+      - Call cover_letter_editor tool with cover_letter_md and JD text.
+      - Tool will create polished cover letter (≤400 words) maintaining structure.
+      - Use the refined_cover_letter from tool output.
+      - Save refined cover letter to output/cover_letter_refined.json.
+  expected_output: >
+    JSON in output/cover_letter_refined.json:
+    {status, message, refined_cover_letter: string, word_count: number}.
+  agent: cover_letter_refiner
+  context:
+    - write_cover_letter_task
+
+analyze_latex_errors_task:
+  description: >
+    Inputs:
+      - read_latex_file("output/generated/rendered_resume.tex") (if available)
+    Goal: Analyze LaTeX compilation errors and provide root cause + fixes.
+    Actions:
+      - This task runs ONLY if LaTeX compilation fails.
+      - Read LaTeX compilation log (from latex_compile_pdf tool output or log file).
+      - Call latex_error_analyzer tool with log text and optional LaTeX source.
+      - Tool will identify root cause, error type, and recommend specific fixes.
+      - Save analysis to output/latex_errors.json.
+  expected_output: >
+    JSON in output/latex_errors.json:
+    {status, message, analysis: {root_cause: string, error_type: string, recommended_fix: string, code_example: string, missing_packages: [string]}}.
+  agent: template_fixer
+  context: []
+  # Note: This task is conditionally executed only when LaTeX compilation fails
+
+# =========================
+# PHASE 7: OPTIONAL TEMPLATE FIXING
+# =========================
 
 fix_template_to_match_reference_task:
   description: >
-    Compare the reference resume PDF with the generated resume PDF, then fix the LaTeX template
-    so that the new generated resume visually matches the reference while preserving the data-driven design.
-
-    Template Variables (will be replaced by pipeline):
-    - Reference PDF: {reference_pdf_path}
-    - Generated PDF: {generated_pdf_path}
-    - Template to fix: {template_tex_path}
-
-    CRITICAL SAFETY RULES:
-    - NEVER hard-code personal data (name, email, location, etc.) into LaTeX
-    - NEVER remove entire sections - only modify layout and formatting
-    - ALWAYS preserve data-driven macros (\name{}, \email{}, \location{}, etc.)
-    - ALWAYS preserve auto-managed regions marked with % === AUTO:... === comments
-    - PREFER commenting out code instead of deleting it
-    - KEEP macros consistent - if you change a command signature, update all usages
-    - AVOID breaking existing \newcommand or \renewcommand definitions
-
-    Step-by-Step Instructions:
-    1. Compare PDFs: Use pdf_comparison_tool to compare {reference_pdf_path} vs {generated_pdf_path}
-    2. Analyze LaTeX: Use latex_structure_analyzer on {template_tex_path} to understand structure
-    3. Identify mismatches:
-       - Header text and layout differences
-       - Contact info formatting (location, website, LinkedIn, GitHub, Scholar)
-       - Section titles, ordering, spacing
-       - Stray template text not present in reference
-    4. Edit LaTeX template:
-       - Use read_latex_file to read the template
-       - Comment out (don't delete) extra template junk
-       - Fix header structure to match reference
-       - Fix link rendering (no duplicates, no partial URLs)
-       - Match section spacing and titles to reference
-       - Keep all data fields driven by macros/JSON, no hard-coded content
-       - Mark auto-managed regions: % === AUTO:HEADER_START === ... % === AUTO:HEADER_END ===
-       - Use write_latex_file to save changes
-    5. Recompile: Use latex_compile_pdf to compile the fixed template
-    6. Iterate: If mismatch persists, repeat steps 1-5 until minimal
-
-    Output: Write to output/template_fix_report.json using write_json_file.
-    Schema: {status: "success"|"error", message: string, changes_made: array, template_path: string, iterations: number, final_match_score: number}
-    
-    ⚠️ CRITICAL RULES:
-    - When calling write_json_file, pass ONLY the raw JSON string. DO NOT wrap it in markdown code fences (```json ... ```). The tool handles formatting automatically.
-    - DO NOT invent fields - only include fields specified in the schema above.
-    - DO NOT change field names - use exact names from schema.
-    - DO NOT mix commentary with JSON - output pure JSON only.
+    Optional debug task (not used in normal runs).
+    Inputs:
+      - Reference PDF path (from pipeline).
+      - Current LaTeX template + compiled PDF.
+    Goal: Suggest minimal LaTeX template edits to better match reference.
+    Actions:
+      - Compare PDFs (generated vs reference).
+      - Locate spacing/header/section differences.
+      - Adjust template via read_latex_file / write_latex_file.
+      - Recompile with latex_compile_pdf.
+      - Save to output/template_fix_report.json.
   expected_output: >
-    A short report describing what changed plus updated LaTeX template(s)
-    that, when compiled, produce a resume visually matching the reference PDF.
+    JSON in output/template_fix_report.json:
+    {status, message, changes: [string], template_path: string,
+     iterations: number, final_match_score: number}.
   agent: template_fixer
   context: []
-  # IMPORTANT: Do NOT use output_file for this task.
-  # The agent MUST write JSON using the write_json_file tool.
-  # CrewAI's output_file feature writes agent's text response, which can overwrite
-  # the JSON written by write_json_file tool, especially in debug mode.
+
+# =========================
+# PHASE 8: ITERATIVE PAGE REDUCTION
+# =========================
+
+iterative_page_reduction_task:
+  description: >
+    CRITICAL: This task runs ONLY when resume exceeds 2-page limit after initial trimming.
+    Goal: Iteratively remove least important content until resume fits in ≤2 pages.
+    
+    Process:
+    1. Read current LaTeX file: read_latex_file("output/generated/rendered_resume.tex")
+    2. Analyze LaTeX gaps: Call latex_gap_analyzer tool to detect excessive whitespace, gaps, and removable sections
+    3. Rank content for removal: Call content_rank_analyzer tool to get prioritized removal suggestions
+    4. Remove least important item: Use content_removal_tool to remove the top-priority item from removal_suggestions
+    5. Re-estimate pages: Use length_budget estimation or check PDF page count
+    6. Repeat steps 2-5 until pages ≤ 2.0 OR max 5 iterations reached
+    
+    Removal priority (from content_rank_analyzer):
+    - Lowest priority experiences (priority_score < 60)
+    - Least relevant projects
+    - Least impactful bullets
+    - Skills not in JD
+    - Summary words (if still over)
+    
+    IMPORTANT:
+    - Remove ONE item per iteration
+    - Always remove the LOWEST priority item first
+    - Stop when estimated_pages ≤ 2.0
+    - Maximum 5 iterations to avoid infinite loops
+    - Save removal log to output/page_reduction_log.json
+    
+  expected_output: >
+    JSON in output/page_reduction_log.json:
+    {status, message, iterations: number, items_removed: [{type, item, reason}],
+     final_estimated_pages: number, target_met: boolean}.
+  agent: pipeline_orchestrator
+  context: []
+  # Note: This task is conditionally executed only when resume exceeds 2 pages

@@ -29,8 +29,11 @@ class LaTeXStructureAnalyzerInput(BaseModel):
 class LaTeXStructureAnalyzerTool(BaseTool):
     """Analyze LaTeX structure, sections, and key commands.
     
-    MVP version: Detects sections, extracts commands, finds template markers.
-    Future: Custom command definitions, AST parsing, dependency analysis.
+    Current: Detects sections, extracts commands, finds template markers.
+    
+    Future: Could be extended to include length/section density estimates
+    for use by higher-level logic (e.g. latex_builder or ATS tools) to
+    suggest which blocks to compress or drop for 1-2 page layouts.
     """
     
     name: str = "latex_structure_analyzer"
@@ -42,15 +45,36 @@ class LaTeXStructureAnalyzerTool(BaseTool):
     args_schema: Type[BaseModel] = LaTeXStructureAnalyzerInput
     
     def _run(self, tex_path: str) -> str:
-        """Analyze LaTeX structure and return JSON report."""
+        """Analyze LaTeX structure and return JSON report.
+        
+        Standard paths:
+        - Template: src/resume_builder/templates/main.tex
+        - Generated LaTeX: output/generated/rendered_resume.tex
+        """
         try:
             # Resolve path
-            tex_file = resolve_under_root(tex_path)
+            try:
+                tex_file = resolve_under_root(tex_path)
+            except ValueError as e:
+                return json.dumps({
+                    "error": str(e),
+                    "status": "error",
+                    "hint": "Use a file path, not a directory. Standard paths: src/resume_builder/templates/main.tex or output/generated/rendered_resume.tex"
+                }, indent=2)
             
             if not tex_file.exists():
                 return json.dumps({
                     "error": f"LaTeX file not found: {tex_path}",
-                    "status": "error"
+                    "status": "error",
+                    "hint": "Standard paths: src/resume_builder/templates/main.tex (template) or output/generated/rendered_resume.tex (generated)"
+                }, indent=2)
+            
+            # Validate it's a file
+            if tex_file.is_dir():
+                return json.dumps({
+                    "error": f"Path is a directory, not a file: {tex_path}",
+                    "status": "error",
+                    "hint": "Use a file path. Standard paths: src/resume_builder/templates/main.tex or output/generated/rendered_resume.tex"
                 }, indent=2)
             
             # Read LaTeX content
@@ -96,7 +120,7 @@ class LaTeXStructureAnalyzerTool(BaseTool):
     
     @staticmethod
     def _detect_sections(tex: str, lines: List[str]) -> Dict[str, Any]:
-        """Detect sections in LaTeX by looking for \section commands."""
+        r"""Detect sections in LaTeX by looking for \section commands."""
         
         sections = {}
         current = "preamble"

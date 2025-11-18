@@ -117,10 +117,10 @@ def main():
             "selected_experiences.json",
             "selected_projects.json",
             "selected_skills.json",
-            "summary_block.json",
-            "education_block.json",
+            "summary.json",
+            "education.json",
             "ats_report.json",
-            "privacy_validation_report.json",
+            "privacy_report.json",
             "cover_letter.json",
             "template_validation.json",
             "tailor_plan.json",
@@ -158,7 +158,7 @@ def main():
         print("=" * 80)
         
         # Check 1: Education is optional (should not block if missing)
-        education_json = OUTPUT_DIR / "education_block.json"
+        education_json = OUTPUT_DIR / "education.json"
         if not education_json.exists():
             print("[OK] Education block is optional (can be missing)")
         else:

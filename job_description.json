@@ -1,22 +1,20 @@
 {
   "status": "success",
-  "message": "Job description parsed successfully",
-  "title": "Software Developer",
-  "company": "Apple",
+  "title": "Sr. Software Developer",
+  "company": "Unknown",
   "location": "Cupertino, California",
+  "seniority": "Senior",
+  "focus_area": "Software Quality and Automated Testing",
   "skills": [
-    "Java",
-    "Python",
-    "JavaScript",
-    "Swift",
-    "SQL"
+    "Automated Testing",
+    "Software Development",
+    "Quality Assurance"
   ],
   "keywords": [
-    "Software Development",
-    "Agile",
-    "Team Collaboration",
-    "Problem Solving",
-    "Debugging"
+    "Software Developer",
+    "Quality",
+    "Testing",
+    "Automated"
   ],
-  "cleaned_text": "We are looking for a Software Developer to join our team at Apple. In this role, you will be responsible for designing and implementing software solutions. You should have a strong proficiency in programming languages such as Java, Python, or Swift. Familiarity with Agile methodologies and a passion for technology is essential. We value diversity and inclusion and are committed to creating a positive workplace culture."
+  "cleaned_text": "The job description is for a Sr. Software Developer position focusing on software quality and automated testing."
 }

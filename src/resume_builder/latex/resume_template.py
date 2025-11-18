@@ -41,10 +41,13 @@ def build_preamble(identity: Dict[str, Any]) -> str:
         preamble_parts.append(f"\\phone{{{phone_formatted}}}")
     
     # Optional: address
-    addr = identity.get('address', '').strip() if identity.get('address') else ''
-    if addr:
-        escaped_addr = escape_latex(addr)
-        preamble_parts.append(f"\\address{{{escaped_addr}}}")
+    # Check for location (new) or address (old) for backward compatibility
+    location = identity.get('location', '').strip() if identity.get('location') else ''
+    if not location:
+        location = identity.get('address', '').strip() if identity.get('address') else ''
+    if location:
+        escaped_location = escape_latex(location)
+        preamble_parts.append(f"\\address{{{escaped_location}}}")
     
     # Optional: website (skip cleanly if missing)
     site = identity.get('website', '').strip() if identity.get('website') else ''
@@ -157,6 +160,8 @@ def build_header(title_line: str, contact_info: Dict[str, Any]) -> str:
             table_content.append(row2_str)
         
         table_latex = f"\\begin{{center}}\\begin{{tabular}}{{ c c c c }}\n" + "\n".join(table_content) + "\n\\end{{tabular}}\\end{{center}}"
+        # Fix double braces issue: replace {{ with { and }} with } for tabular/center tags
+        table_latex = table_latex.replace("\\end{{tabular}}", "\\end{tabular}").replace("\\end{{center}}", "\\end{center}")
         parts.append(table_latex)
     
     return "\n".join(parts) if parts else ""
